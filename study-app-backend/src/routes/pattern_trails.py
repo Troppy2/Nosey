@@ -137,8 +137,9 @@ async def step_writeup(
     service = PatternTrailService()
     step = await _run(service.pending_writeup(session, user.id, step_id))
     written = "\n".join([body.approach, body.how_it_works, body.complexity, body.thought_process])
-    # GH #173: typed text is screened before it reaches any AI model.
-    await screen_user_input(user, WRITEUP_FEATURE, written)
+    # GH #173: typed text is screened before it reaches any AI model, the code included
+    # (its comments and strings are free text that Kojo reads too).
+    await screen_user_input(user, WRITEUP_FEATURE, written, body.code)
 
     grade = None
     if user.age is None or user.age >= 15:  # same age floor as Kojo chat
