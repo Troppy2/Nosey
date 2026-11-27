@@ -528,7 +528,9 @@ function drawYarn(state: GameState, p: Palette, ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = p.greenMid;
   ctx.fillRect(snap(left) + shadowInset, GROUND_Y, YARN_R * 2 - shadowInset * 2, CELL);
 
-  const frameIndex = Math.floor(state.yarnRoll / ((Math.PI * 2) / YARN_FRAMES)) % YARN_FRAMES;
+  // Wrap negative rolls too: a plain % gives a negative index (undefined frame, crash).
+  const step = Math.floor(state.yarnRoll / ((Math.PI * 2) / YARN_FRAMES)) || 0;
+  const frameIndex = ((step % YARN_FRAMES) + YARN_FRAMES) % YARN_FRAMES;
   drawSprite(ctx, YARN_FRAME_SPRITES[frameIndex], left, top, { y: p.amber, d: p.amberDark });
 }
 

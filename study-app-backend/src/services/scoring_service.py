@@ -14,6 +14,11 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
+
+def _utc(dt: datetime) -> datetime:
+    """Naive datetimes (SQLite, some query params) are UTC; make them comparable with aware ones."""
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -187,13 +192,13 @@ class ScoringService:
     ) -> LCWeaknessResponse:
         weakness_since = now - timedelta(days=WEAKNESS_LOOKBACK_DAYS)
         # Clear weakness signals (Part E): ignore everything before the reset marker.
-        if reset_at is not None and reset_at > weakness_since:
-            weakness_since = reset_at
-        window_events = [e for e in events if e.occurred_at >= weakness_since]
-        window_failed_runs = [r for r in runs if not r.passed and r.run_at >= weakness_since]
+        if reset_at is not None and _utc(reset_at) > weakness_since:
+            weakness_since = _utc(reset_at)
+        window_events = [e for e in events if _utc(e.occurred_at) >= weakness_since]
+        window_failed_runs = [r for r in runs if not r.passed and _utc(r.run_at) >= weakness_since]
         if not window_events and not window_failed_runs:
             return LCWeaknessResponse(topics=[])
-        passed_runs = [r for r in runs if r.passed and r.run_at >= weakness_since]
+        passed_runs = [r for r in runs if r.passed and _utc(r.run_at) >= weakness_since]
         mult = _sensitivity_multiplier(sensitivity)
 
         # Grace period lookup: total runs ever for each slug referenced this window
@@ -374,8 +379,8 @@ class ScoringService:
             reasons: list[str] = []
 
             topic_runs = runs_by_topic[topic]
-            recent_runs = [row for row in topic_runs if row.run_at >= recent_start]
-            older_runs = [row for row in topic_runs if row.run_at < recent_start]
+            recent_runs = [row for row in topic_runs if _utc(row.run_at) >= recent_start]
+            older_runs = [row for row in topic_runs if _utc(row.run_at) < recent_start]
 
             # Signal 1: pass-rate trend (needs data on both sides to compare).
             if recent_runs and older_runs:
