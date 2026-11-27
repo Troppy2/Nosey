@@ -3,12 +3,28 @@ import {
   initialLayout,
   panels,
   readLayout,
+  readFixedLayout,
   reduceLayout,
   tabs,
   type Edge,
 } from "./editorLayout";
 
 describe("editor layout", () => {
+  it("persists in-pane order and rejects cross-pane reorder requests", () => {
+    const fixed = initialLayout();
+    const reordered = reduceLayout(fixed,{type:"reorder",id:"left",tab:"Notes",before:"Description"});
+    expect(panels(readFixedLayout(JSON.stringify(reordered)).root)[0].tabs[0]).toBe("Notes");
+    expect(panels(reduceLayout(reordered,{type:"reorder",id:"code",tab:"Notes",before:"Code"}).root)[1].tabs).toEqual(["Code"]);
+  });
+  it("restores fixed tab order and panes while retaining valid saved split sizes", () => {
+    let old = reduceLayout(initialLayout(), {type:"move", tab:"Notes", to:"code", edge:"center"});
+    old = reduceLayout(old, {type:"resize",id:"columns",ratio:0.46});
+    old = reduceLayout(old, {type:"max",id:"code"});
+    const fixed = readFixedLayout(JSON.stringify(old));
+    expect(fixed.max).toBeNull();
+    expect(panels(fixed.root).map((panel) => panel.tabs)).toEqual(panels(initialLayout().root).map((panel) => panel.tabs));
+    expect(fixed.root.kind === "split" && fixed.root.ratio).toBe(0.46);
+  });
   it("reorders within a panel and preserves the code tab when a panel disappears", () => {
     const reordered = reduceLayout(initialLayout(), {
       type: "move",

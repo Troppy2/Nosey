@@ -380,9 +380,11 @@ type Props = {
   label: string;
   placeholder?: string;
   autoFocus?: boolean;
+  /** Receives the editor view, for a host toolbar that formats the document. */
+  viewRef?: { current: EditorView | null };
 };
 
-export default function MarkdownLiveEditor({ value, onChange, label, placeholder, autoFocus }: Props) {
+export default function MarkdownLiveEditor({ value, onChange, label, placeholder, autoFocus, viewRef: hostViewRef }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -411,10 +413,12 @@ export default function MarkdownLiveEditor({ value, onChange, label, placeholder
       state: EditorState.create({ doc: value, extensions }),
     });
     viewRef.current = view;
+    if (hostViewRef) hostViewRef.current = view;
     if (autoFocus) view.focus();
     return () => {
       view.destroy();
       viewRef.current = null;
+      if (hostViewRef) hostViewRef.current = null;
     };
     // The editor is created once; later value changes are synced below.
   }, []);

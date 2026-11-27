@@ -93,3 +93,47 @@ export function formatSelection(state: EditorState, kind: FormatKind): Transacti
     };
   });
 }
+
+export type LineKind = "heading" | "bullet" | "numbered" | "quote";
+
+const LINE_MATCH: Record<LineKind, RegExp> = {
+  heading: /^#{1,6}\s+/,
+  bullet: /^[-*+]\s+/,
+  numbered: /^\d+\.\s+/,
+  quote: /^>\s?/,
+};
+
+/** Toggles a line format on every line the selection touches: removes it when all
+    those lines already have it, otherwise adds it (numbering lists from 1). */
+export function toggleLines(state: EditorState, kind: LineKind): TransactionSpec {
+  const numbers = new Set<number>();
+  for (const range of state.selection.ranges) {
+    const last = state.doc.lineAt(range.to).number;
+    for (let n = state.doc.lineAt(range.from).number; n <= last; n++) numbers.add(n);
+  }
+  const lines = [...numbers].sort((a, b) => a - b).map((n) => state.doc.line(n));
+  const filled = lines.filter((line) => line.text.trim());
+  const target = filled.length ? filled : lines;
+  const remove = target.every((line) => LINE_MATCH[kind].test(line.text));
+  const changes = target.map((line, index) => {
+    if (remove) return { from: line.from, to: line.from + (line.text.match(LINE_MATCH[kind])?.[0].length ?? 0), insert: "" };
+    const prefix = kind === "heading" ? "## " : kind === "bullet" ? "- " : kind === "numbered" ? `${index + 1}. ` : "> ";
+    return { from: line.from, insert: prefix };
+  });
+  // A cursor at the start of a line moves past the new prefix, so typing continues the item.
+  const changeSet = state.changes(changes);
+  return { changes: changeSet, selection: state.selection.map(changeSet, 1) };
+}
+
+/** Wraps the selection as a markdown link and selects the url to type over. */
+export function insertLink(state: EditorState): TransactionSpec {
+  return state.changeByRange((range) => {
+    const text = state.sliceDoc(range.from, range.to) || "link";
+    const insert = `[${text}](url)`;
+    const urlStart = range.from + text.length + 3;
+    return {
+      changes: { from: range.from, to: range.to, insert },
+      range: EditorSelection.range(urlStart, urlStart + 3),
+    };
+  });
+}

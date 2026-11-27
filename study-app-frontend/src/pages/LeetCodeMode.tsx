@@ -2,7 +2,7 @@ import Editor, { type Monaco } from "@monaco-editor/react";
 // Youtube, Play and Notebook are the classic editor's icons, restored as they were (no new Lucide icons).
 import { Gauge, Circle, Eye, ExternalLink, Flame, Youtube, ListChecks, Loader2, Network, Play, Route, ShieldAlert, Shuffle, Trophy, Users, WrapText, type LucideIcon, Code, Notebook, Wand2, Archive, ArchiveRestore } from "lucide-react";
 import { BookIcon, CodeIcon, ScoreRiseIcon, SettingsIcon } from "../icons";
-import { PlayIcon, TrailIcon } from "../icons";
+import { PlayIcon, TimerIcon, TrailIcon, UploadIcon } from "../icons";
 import {
   ArraysIcon, BacktrackIcon, BinarySearchIcon, BinderIcon, BitsIcon, CodeWindowIcon, DpTableIcon, DrillsIcon, DumbbellIcon,
   GraphIcon, HashTableIcon, HeapIcon, IntervalsIcon, LectureIcon, LinkedListIcon, MathIcon, ProblemListIcon, PuzzleIcon,
@@ -16,9 +16,20 @@ import KojoMascot from "../components/KojoMascot";
 import type { ComponentType, CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MarkdownContent } from "../components/MarkdownContent";
+import { EditorRunResult } from "../components/EditorRunResult";
+import { EditorTestCases } from "../components/EditorTestCases";
 import { EditorDock } from "../components/EditorDock";
-import { EditorNotes, EditorSolutions, EditorSubmissions } from "../components/EditorStudyTabs";
-import { InlineLoading, LoadingNotice } from "../components/Loaders";
+import { EditorDialog } from "../components/EditorDialog";
+import { editorRunError } from "../lib/editorFeedback";
+import { EmptyState } from "../components/EmptyState";
+import { EditorNotes, EditorSolutions } from "../components/EditorStudyTabs";
+import { EditorSubmissions } from "../components/EditorSubmissions";
+import { ProblemTimer } from "../components/ProblemTimer";
+import { countdown, loadTimer, saveTimer, type ProblemTimer as TimerState } from "../lib/problemTimer";
+import { EditorStatusBar, type CursorSource } from "../components/EditorStatusBar";
+import { defineEditorThemes, EDITOR_COLORS, editorThemeFor, type EditorColor } from "../lib/monacoTheme";
+import { addSubmission, setSubmissionFeedback } from "../lib/submissionLog";
+import { InlineLoading, LoadingNotice, Spinner } from "../components/Loaders";
 import { SkeletonList } from "../components/Skeletons";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { Button } from "../components/Button";
@@ -474,14 +485,6 @@ const MAX_CODE_TABS = 5;
 const CODE_TAB_ID_KEY = "nosey_lc_tab_id";
 const CODE_WORKSPACE_KEY_PREFIX = "nosey_lc_code_tabs";
 const CODE_KEY_PREFIX = "nosey_lc_code";
-const TIMER_PRESETS = [15, 25, 45];
-// Captions encode what each preset is actually for (a warm-up rep vs. a full mock
-// interview clock), not just a restatement of the number above them.
-const TIMER_PRESET_CAPTIONS: Record<number, string> = {
-  15: "Quick rep",
-  25: "Standard",
-  45: "Deep dive",
-};
 const NOTES_KEY_PREFIX = "nosey_lc_notes";
 
 const CHAT_COMMANDS: SlashCommand[] = [
@@ -1239,8 +1242,20 @@ const RAIL_ITEMS: { key: string; label: string; icon: KojoIcon; view: View }[] =
 
 const RAIL_COLLAPSE_KEY = "nosey_lc_rail_collapsed";
 const EDITOR_RAIL_COLLAPSE_KEY = "nosey_lc_rail_collapsed_editor";
+const DIFFICULTY_OPTIONS = [
+  { key: "easy", label: "Easy" },
+  { key: "medium", label: "Just right" },
+  { key: "hard", label: "Hard" },
+  { key: "brutal", label: "Brutal" },
+] as const;
+
 // "classic" = the editor before the tabbed dock; anything else = tabbed.
 const EDITOR_STYLE_KEY = "nosey_lc_editor_style";
+const EDITOR_COLOR_KEY = "nosey_lc_editor_color";
+const EDITOR_FONT_KEY = "nosey_lc_editor_font";
+const EDITOR_WRAP_KEY = "nosey_lc_editor_wrap";
+type EditorFontSize = "small" | "medium" | "large";
+const EDITOR_FONT_PX: Record<EditorFontSize, number> = { small: 13, medium: 14, large: 16 };
 // The problem editor renders the same rail but starts icon-only and remembers its own
 // preference, so collapsing it there never collapses the hub rail (and vice versa).
 // Sentinel key for visualizerLoading when tracing the KojoCode model solution's own
@@ -1331,6 +1346,7 @@ function LeftRail({
               ref={isActive ? activeItemRef : undefined}
               className={`lc-rail-item${isActive ? " is-active" : ""}`}
               aria-current={isActive ? "page" : undefined}
+              aria-label={item.label}
               title={collapsed ? item.label : undefined}
               onClick={() => onNavigate(item.view)}
             >
@@ -1346,44 +1362,6 @@ function LeftRail({
         <small className="lc-rail-item-label">day streak</small>
       </div>
     </aside>
-  );
-}
-
-// A literal countdown instrument: the ring drains as time passes instead of sitting
-// as inert digits, and its color runs calm -> warn -> alert with the same thresholds
-// the toolbar button and the modal use, so the three surfaces read as one system.
-function TimerRing({
-  fraction,
-  tone,
-  size = 30,
-  stroke = 3,
-}: {
-  fraction: number;
-  tone: "idle" | "calm" | "warn" | "alert";
-  size?: number;
-  stroke?: number;
-}) {
-  const radius = (size - stroke) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference * (1 - Math.max(0, Math.min(1, fraction)));
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className={`lc-timer-ring lc-timer-ring--${tone}`} aria-hidden="true">
-      <circle className="lc-timer-ring-track" cx={size / 2} cy={size / 2} r={radius} strokeWidth={stroke} fill="none" />
-      {tone !== "idle" ? (
-        <circle
-          className="lc-timer-ring-progress"
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          strokeWidth={stroke}
-          fill="none"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          transform={`rotate(-90 ${size / 2} ${size / 2})`}
-        />
-      ) : null}
-    </svg>
   );
 }
 
@@ -2250,6 +2228,8 @@ export default function LeetCodeMode() {
   const [customCases, setCustomCases] = useState<Record<string, CustomCase[]>>({});
   const [runnerLoading, setRunnerLoading] = useState(false);
   const [runnerResult, setRunnerResult] = useState<RunnerResult | null>(null);
+  const [resultDrillSlug, setResultDrillSlug] = useState<string | null>(null);
+  const [gradeError, setGradeError] = useState(false);
   const [historyRevision,setHistoryRevision] = useState(0);
   const [gradeLoading, setGradeLoading] = useState(false);
   const [gradeFeedback, setGradeFeedback] = useState<string | null>(null);
@@ -2261,6 +2241,47 @@ export default function LeetCodeMode() {
       return false;
     }
   });
+  // Code editor colour (KojoCode settings). Black, Monaco's dark theme, stays the default.
+  const [editorColor, setEditorColor] = useState<EditorColor>(() => {
+    try {
+      const saved = localStorage.getItem(scopeKey(EDITOR_COLOR_KEY));
+      return EDITOR_COLORS.some((item) => item.value === saved) ? (saved as EditorColor) : "black";
+    } catch {
+      return "black";
+    }
+  });
+  // Code font size and line wrap (KojoCode settings), for both editors.
+  const [editorFontSize, setEditorFontSize] = useState<EditorFontSize>(() => {
+    try {
+      const saved = localStorage.getItem(scopeKey(EDITOR_FONT_KEY));
+      return saved === "small" || saved === "large" ? saved : "medium";
+    } catch {
+      return "medium";
+    }
+  });
+  const [editorWrap, setEditorWrap] = useState(() => {
+    try {
+      return localStorage.getItem(scopeKey(EDITOR_WRAP_KEY)) === "on";
+    } catch {
+      return false;
+    }
+  });
+  function saveEditorPref(key: string, value: string) {
+    try {
+      localStorage.setItem(scopeKey(key), value);
+    } catch {
+      /* Storage unavailable: the choice lasts for this visit. */
+    }
+  }
+  function chooseEditorColor(color: EditorColor) {
+    setEditorColor(color);
+    try {
+      localStorage.setItem(scopeKey(EDITOR_COLOR_KEY), color);
+    } catch {
+      /* Storage unavailable: the choice lasts for this visit. */
+    }
+  }
+
   function chooseEditorStyle(classic: boolean) {
     setClassicEditor(classic);
     try {
@@ -2286,17 +2307,6 @@ export default function LeetCodeMode() {
   const [complexitySpaceWhy, setComplexitySpaceWhy] = useState("");
   const [complexityLoading, setComplexityLoading] = useState(false);
   const [complexityResult, setComplexityResult] = useState<LeetCodeComplexityCheckResponse | null>(null);
-  const [timerMinutesInput, setTimerMinutesInput] = useState("25");
-  const [timerRemainingSeconds, setTimerRemainingSeconds] = useState<number | null>(null);
-  // Total duration the current countdown started from, kept only to compute the ring's
-  // drained fraction (remaining / total) -- not itself a source of truth for anything else.
-  const [timerTotalSeconds, setTimerTotalSeconds] = useState<number | null>(null);
-  const [timerPickerOpen, setTimerPickerOpen] = useState(false);
-  const [timeoutModalOpen, setTimeoutModalOpen] = useState(false);
-  const [timeoutModalMessage, setTimeoutModalMessage] = useState<string | null>(null);
-  // Slug whose "Time's up" modal is open on a FAILED attempt; the "Add to 3-Pass Drill?"
-  // prompt is offered when that modal closes (so the two modals never stack).
-  const [timeoutDrillSlug, setTimeoutDrillSlug] = useState<string | null>(null);
   // Slugs the user has run code against at least once, loaded from localStorage. Keeps
   // the KojoCode solution unlocked across code edits / problem switches (see getAttemptedKey).
   const [attemptedSlugs, setAttemptedSlugs] = useState<Set<string>>(() => {
@@ -2316,7 +2326,6 @@ export default function LeetCodeMode() {
   const currentCodeRef = useRef("");
   const currentProblemDataRef = useRef<LeetCodeProblemData | undefined>(undefined);
   const currentCustomCasesRef = useRef<CustomCase[]>([]);
-  const timerExpiryHandledRef = useRef(false);
   const workspaceSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingWorkspaceSyncRef = useRef<{ slug: string; workspace: CodeWorkspace } | null>(null);
   const [streakChallenge, setStreakChallenge] = useState<LCStreakChallenge | null>(null);
@@ -2404,6 +2413,70 @@ export default function LeetCodeMode() {
   const [clearWeaknessConfirm, setClearWeaknessConfirm] = useState(false);
   // "How hard did that feel?" prompt: the slug awaiting a rating (null = closed).
   const [difficultyPromptSlug, setDifficultyPromptSlug] = useState<string | null>(null);
+  // The tabbed editor asks the post-Submit questions inside Test result instead of in
+  // modals, so the result is never hidden. A manual Mark done still uses the modals.
+  const [inlineCompletion, setInlineCompletion] = useState(false);
+  // Whether the last result came from Run (a preview) or Submit (graded and recorded).
+  const [runKind, setRunKind] = useState<"run" | "submit">("run");
+  // Run and Submit for the LeetCode shortcuts (Ctrl+' and Ctrl+Enter), set by the tabbed editor.
+  const shortcutsRef = useRef<{ run?: () => void; submit?: () => void }>({});
+  // The problem a pass-3 drill timer was auto-started for, so it starts once per open.
+  const drillTimerSlugRef = useRef<string | null>(null);
+  // The mounted code editor, for the tabbed editor's status bar (cursor position).
+  const [cursorSource, setCursorSource] = useState<CursorSource | null>(null);
+  // The submit made on this visit, opened in the Submissions tab.
+  const [latestSubmit, setLatestSubmit] = useState<{ slug: string; at: string; ok: boolean } | null>(null);
+  // A submit's test cases are running (grading comes after and shows in the result).
+  const [submitRunning, setSubmitRunning] = useState(false);
+  // When the open problem was opened, for "Time spent" on a submission.
+  const openedAtRef = useRef<{ slug: string; at: number } | null>(null);
+  const openSlug = view.type === "problem" ? view.problemSlug : null;
+  useEffect(() => {
+    openedAtRef.current = openSlug ? { slug: openSlug, at: Date.now() } : null;
+  }, [openSlug]);
+  // Each problem keeps its own timer (clock based, saved), so it survives reloads and
+  // switching problems. Keyed by slug so a switch never shows the last problem's timer.
+  const [timerState, setTimerState] = useState<{ slug: string | null; timer: TimerState | null }>(() => ({
+    slug: openSlug,
+    timer: openSlug ? loadTimer(openSlug) : null,
+  }));
+  const problemTimer = timerState.slug === openSlug ? timerState.timer : openSlug ? loadTimer(openSlug) : null;
+  function setProblemTimer(timer: TimerState | null, slug = openSlug) {
+    if (!slug) return;
+    saveTimer(slug, timer);
+    setTimerState({ slug, timer });
+  }
+  useEffect(() => {
+    setTimerState({ slug: openSlug, timer: openSlug ? loadTimer(openSlug) : null });
+    if (view.type !== "problem") drillTimerSlugRef.current = null;
+  }, [openSlug]);
+  // The Time's up card for a countdown that just reached zero.
+  const [timeUp, setTimeUp] = useState<{ slug: string; minutes: number } | null>(null);
+  useEffect(() => {
+    if (timeUp && timeUp.slug !== openSlug) setTimeUp(null);
+  }, [openSlug, timeUp]);
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.defaultPrevented || !(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+      if (!document.querySelector(".lc-docked") || document.querySelector('[aria-modal="true"]')) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest(".kojo-panel") || (target?.matches("input, textarea, [contenteditable='true']") && !target.closest(".monaco-editor"))) return;
+      const action = event.key === "Enter" ? shortcutsRef.current.submit : event.key === "'" ? shortcutsRef.current.run : undefined;
+      if (!action) return;
+      event.preventDefault();
+      action();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+  // Leaving the editor drops unanswered inline prompts instead of popping them up as modals.
+  useEffect(() => {
+    if (view.type === "problem" || !inlineCompletion) return;
+    setInlineCompletion(false);
+    setDifficultyPromptSlug(null);
+    setDrillPromptSlug(null);
+    setPendingDrillPromptSlug(null);
+  }, [view.type, inlineCompletion]);
   // First-solve timestamp per slug (ISO), from the server (solved_at). Powers the
   // completed-questions history in the settings modal. Server-authoritative.
   const [solvedAt, setSolvedAt] = useState<Record<string, string>>({});
@@ -2538,13 +2611,6 @@ export default function LeetCodeMode() {
   const currentCodeTab = currentCodeWorkspace?.tabs.find((tab) => tab.id === currentCodeWorkspace.activeTabId) ?? currentCodeWorkspace?.tabs[0] ?? null;
   const currentCode = currentCodeTab?.code ?? "";
   const allKojoCommands = [...CHAT_COMMANDS, ...customSlashCommands];
-  const timerButtonLabel = timerRemainingSeconds == null ? "Timer" : `${Math.floor(timerRemainingSeconds / 60)}:${String(timerRemainingSeconds % 60).padStart(2, "0")}`;
-  const timerFraction = timerTotalSeconds && timerRemainingSeconds != null ? timerRemainingSeconds / timerTotalSeconds : null;
-  // calm for most of the run, warn inside the last third, alert inside the last fifth --
-  // same thresholds drive the ring color, the toolbar pill, and the pulse animation.
-  const timerTone: "idle" | "calm" | "warn" | "alert" =
-    timerFraction == null ? "idle" : timerFraction <= 0.2 ? "alert" : timerFraction <= 0.34 ? "warn" : "calm";
-
   useEffect(() => {
     currentCodeRef.current = currentCode;
   }, [currentCode]);
@@ -2876,33 +2942,15 @@ export default function LeetCodeMode() {
       });
   }, [currentProblem, problemStates]);
 
-  useEffect(() => {
-    if (!currentProblem || timerRemainingSeconds == null || timeoutModalOpen) return;
-    if (timerRemainingSeconds <= 0) return;
-
-    const timeoutId = window.setTimeout(() => {
-      setTimerRemainingSeconds((previous) => (previous == null ? previous : Math.max(previous - 1, 0)));
-    }, 1000);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [currentProblem?.slug, timerRemainingSeconds, timeoutModalOpen]);
-
-  useEffect(() => {
-    if (!currentProblem || timerRemainingSeconds == null || timerRemainingSeconds > 0 || timeoutModalOpen) return;
-    if (timerExpiryHandledRef.current) return;
-
-    timerExpiryHandledRef.current = true;
-    void handleTimerExpired(currentProblem);
-  }, [currentProblem?.slug, timerRemainingSeconds, timeoutModalOpen]);
-
   // Pass 3 drills force a timer: auto-start it once when such a problem opens and no timer
   // is running. Keyed on the opened slug + drills so it fires on open (or when a pass is
   // advanced to 3 in place), not on every tick, so it never restarts after expiry or bail.
   useEffect(() => {
     if (!betaMode || view.type !== "problem") return;
     const drill = drills.find((d) => d.problem_slug === view.problemSlug && !d.completed_at);
-    if ((drill?.current_pass ?? 1) >= 3 && timerRemainingSeconds == null) {
-      startTimer(DRILL_PASS3_MINUTES);
+    if ((drill?.current_pass ?? 1) >= 3 && drillTimerSlugRef.current !== view.problemSlug && !loadTimer(view.problemSlug)) {
+      drillTimerSlugRef.current = view.problemSlug;
+      setProblemTimer(countdown(DRILL_PASS3_MINUTES, Date.now()), view.problemSlug);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, drills, betaMode]);
@@ -4080,6 +4128,7 @@ export default function LeetCodeMode() {
     const nextCounts = isNewSolve ? bumpTodayCount() : solvedDayCounts;
     pushProgressToDb(next, nextDates, nextCounts).then(refreshServerCounts);
     applyBankCompletion(problem.slug, nextDone);
+    setInlineCompletion(false);
     if (nextDone) onProblemCompleted(problem, "never");
   }
 
@@ -4313,69 +4362,6 @@ export default function LeetCodeMode() {
     }
   }
 
-  function closeTimerPicker() {
-    setTimerPickerOpen(false);
-  }
-
-  function closeTimeoutModal() {
-    setTimeoutModalOpen(false);
-    setTimeoutModalMessage(null);
-    // Failed timer run: offer the drill now that the "Time's up" modal is dismissed.
-    if (timeoutDrillSlug) {
-      const slug = timeoutDrillSlug;
-      setTimeoutDrillSlug(null);
-      maybePromptAddDrill(slug);
-    }
-  }
-
-  function resetTimerState() {
-    timerExpiryHandledRef.current = false;
-    setTimerRemainingSeconds(null);
-    setTimerTotalSeconds(null);
-    closeTimerPicker();
-    closeTimeoutModal();
-  }
-
-  function startTimer(minutes: number) {
-    if (!currentProblem || !Number.isFinite(minutes) || minutes <= 0) return;
-
-    timerExpiryHandledRef.current = false;
-    closeTimerPicker();
-    closeTimeoutModal();
-    const totalSeconds = Math.round(minutes * 60);
-    setTimerRemainingSeconds(totalSeconds);
-    setTimerTotalSeconds(totalSeconds);
-  }
-
-  function openTimerPicker() {
-    setTimerPickerOpen(true);
-  }
-
-  function applyTimerFromInput() {
-    const parsed = Number(timerMinutesInput);
-    if (!Number.isFinite(parsed) || parsed <= 0) return;
-
-    startTimer(parsed);
-    setTimerMinutesInput(String(Math.round(parsed)));
-  }
-
-  function renderTimerPreset(minutes: number) {
-    return (
-      <button
-        key={minutes}
-        type="button"
-        className="lc-timer-modal-preset"
-        onClick={() => {
-          setTimerMinutesInput(String(minutes));
-          startTimer(minutes);
-        }}
-      >
-        <span className="lc-timer-modal-preset-value">{minutes}</span>
-        <span className="lc-timer-modal-preset-caption">{TIMER_PRESET_CAPTIONS[minutes] ?? "min"}</span>
-      </button>
-    );
-  }
-
   function getNotesKey(problemSlug: string) {
     return `${NOTES_KEY_PREFIX}:${getUserStoragePrefix()}:${problemSlug}`;
   }
@@ -4430,19 +4416,6 @@ export default function LeetCodeMode() {
     }
   }
 
-  function clearActiveTabWork() {
-    if (!currentProblem) return;
-    const slug = currentProblem.slug;
-    const workspace = codeWorkspaces[slug] ?? loadCodeWorkspace(slug);
-    const nextWorkspace = {
-      ...workspace,
-      tabs: workspace.tabs.map((tab) => (tab.id === workspace.activeTabId ? { ...tab, code: "" } : tab)),
-    };
-    saveCodeWorkspace(slug, nextWorkspace);
-    pushWorkspaceToDb(slug, nextWorkspace);
-    setCodeWorkspaces((prev) => ({ ...prev, [slug]: nextWorkspace }));
-  }
-
   async function runAndGradeCurrentCode(
     problemAtRun: Problem,
     codeToRun: string,
@@ -4453,7 +4426,21 @@ export default function LeetCodeMode() {
     promptDrillOnFail = true,
     preview = false,
   ) {
-    if (!problemDataAtRun || !isRunnable(problemDataAtRun)) return null;
+    setResultDrillSlug(null);
+    setGradeError(false);
+    if (!preview) {
+      setGradeFeedback(null);
+      setComplexityResult(null);
+    }
+    setRunKind(preview ? "run" : "submit");
+    if (!codeToRun.trim()) {
+      setRunnerResult({ ok: false, notice: true, output: "Write some code first", error: "Add your solution in the Code tab, then run or submit it." });
+      return null;
+    }
+    if (!problemDataAtRun || !isRunnable(problemDataAtRun)) {
+      setRunnerResult({ ok: false, notice: true, output: "This problem is not ready to run", error: "Running needs starter code and at least one test case. You can still use the editor." });
+      return null;
+    }
 
     const officialCases = problemDataAtRun.examples.map((example) => ({
       label: `Official ${example.index}`,
@@ -4469,17 +4456,42 @@ export default function LeetCodeMode() {
       }));
 
     setRunnerLoading(true);
+    setSubmitRunning(!preview);
     setRunnerResult(null);
     // The code (and its test cases) may have changed, so the old feedback is stale:
     // drop it and the saved copy now, and let this run generate a fresh grade.
-    setGradeFeedback(null);
-    clearGradeFeedback(problemAtRun.slug);
-    // The complexity verdict was graded against the previous code, so it's stale too.
-    // Drop the verdict but keep the user's typed claims so they don't have to retype.
-    setComplexityResult(null);
+    if (!preview) {
+      setGradeFeedback(null);
+      clearGradeFeedback(problemAtRun.slug);
+      // The complexity verdict was graded against the previous code, so it's stale too.
+      // Drop the verdict but keep the user's typed claims so they don't have to retype.
+      setComplexityResult(null);
+    }
     try {
-      const result = await runPythonLeetCode(codeToRun, [...officialCases, ...validCustomCases]);
-      setRunnerResult(result);
+      const allCases = [...officialCases, ...validCustomCases];
+      const result = await runPythonLeetCode(codeToRun, allCases);
+      // The result view shows each case's input beside its output, as LeetCode does.
+      const inputs = new Map(allCases.map((item) => [item.label, item.inputText]));
+      const shown = {
+        ...result,
+        error: editorRunError(result.error),
+        cases: result.cases?.map((item) => ({ ...item, input: inputs.get(item.label) })),
+      };
+      setRunnerResult(shown);
+      // A submit keeps its own record (result, runtime, time spent, later Kojo's feedback)
+      // so the Submissions tab can show it after later runs replace Test result.
+      let submittedAt: string | null = null;
+      if (!preview) {
+        const opened = openedAtRef.current;
+        const record = addSubmission(problemAtRun.slug, {
+          at: new Date().toISOString(),
+          result: shown,
+          elapsedMs: opened?.slug === problemAtRun.slug ? Date.now() - opened.at : undefined,
+        });
+        submittedAt = record.at;
+        setLatestSubmit({ slug: problemAtRun.slug, at: record.at, ok: result.ok });
+      }
+      setSubmitRunning(false);
       // Persist that this problem has been attempted, so its KojoCode solution stays
       // unlocked even after the user edits code or navigates away and back.
       if (!attemptedSlugs.has(problemAtRun.slug)) {
@@ -4492,6 +4504,11 @@ export default function LeetCodeMode() {
         }
       }
 
+      // Run is a preview: only Submit is recorded, so Submissions lists real submits.
+      if (preview) {
+        return result;
+      }
+
       if (result.cases?.length) {
         const customForGrade = customProblems.find((cp) => cp.slug === problemAtRun.slug);
         void postLCTestRun(
@@ -4502,11 +4519,6 @@ export default function LeetCodeMode() {
           resolveProblemSubtopic(problemAtRun.slug),
           interviewRealism,
         ).then(() => setHistoryRevision(v => v + 1));
-      }
-
-      if (preview) {
-        (result.ok ? toast.success : toast.info)(result.ok ? "Tests passed" : "Check the test result");
-        return result;
       }
 
       // Interview realism: a real interviewer never tells you the bug or the fix, so Kojo
@@ -4536,58 +4548,38 @@ export default function LeetCodeMode() {
           );
           setGradeFeedback(grade.feedback);
           saveGradeFeedback(problemAtRun.slug, grade.feedback);
+          if (submittedAt) setSubmissionFeedback(problemAtRun.slug, submittedAt, grade.feedback);
         } catch {
-          // grading is best-effort , don't block the run result
+          setGradeError(true);
         } finally {
           setGradeLoading(false);
         }
       }
 
-      (result.ok ? toast.success : toast.info)(result.ok ? "Submission accepted" : "Submission checked");
       if (result.ok) {
         markProblemDone(problemAtRun);
         void maybeAutoAdvanceDrill(problemAtRun.slug);
       } else if (promptDrillOnFail && result.cases?.length) {
-        // A failed grade used to silently add a drill; now it just OFFERS one (once per
-        // problem). The timer path defers this to its own modal close (see below).
-        maybePromptAddDrill(problemAtRun.slug);
+        // Offer a drill inline only after the test result is available.
+        setResultDrillSlug(problemAtRun.slug);
       }
 
       return result;
+    } catch {
+      setRunnerResult({ ok: false, output: "Could not run your code", error: "The Python runner could not start. Check your connection and try again. Your code is saved." });
+      return null;
     } finally {
       setRunnerLoading(false);
+      setSubmitRunning(false);
     }
   }
 
-  async function handleTimerExpired(problemAtTimeout: Problem) {
-    if (runnerLoading || gradeLoading) {
-      setTimeoutModalMessage("Time ran out while Kojo was still grading your current run. You can continue without the timer or clear the active tab.");
-      setTimeoutModalOpen(true);
-      return;
-    }
-
-    void logLCStruggleEvent(resolveProblemTopic(problemAtTimeout.slug), "timer_expiry", problemAtTimeout.slug, resolveProblemSubtopic(problemAtTimeout.slug));
-
-    const result = await runAndGradeCurrentCode(
-      problemAtTimeout,
-      currentCodeRef.current,
-      currentProblemDataRef.current,
-      currentCustomCasesRef.current,
-      false, // defer the drill prompt until the "Time's up" modal closes
-    );
-
-    if (result?.ok) {
-      resetTimerState();
-      return;
-    }
-
-    setTimeoutModalMessage(
-      interviewRealism
-        ? "Time's up. Your attempt does not pass every test case yet."
-        : "Time's up. Kojo graded your attempt and it still needs more work.",
-    );
-    setTimeoutDrillSlug(problemAtTimeout.slug);
-    setTimeoutModalOpen(true);
+  // A countdown reached zero: it keeps running as overtime. Record the weak-topic signal
+  // (as before) and show the Time's up card; nothing is submitted for the student.
+  function handleTimerZero() {
+    if (!currentProblem) return;
+    void logLCStruggleEvent(resolveProblemTopic(currentProblem.slug), "timer_expiry", currentProblem.slug, resolveProblemSubtopic(currentProblem.slug));
+    setTimeUp({ slug: currentProblem.slug, minutes: Math.round((problemTimer?.totalMs ?? 0) / 60_000) });
   }
 
   function openProblem(categoryId: string, problemSlug: string) {
@@ -4604,10 +4596,11 @@ export default function LeetCodeMode() {
     setSolutionOpen(false);
     setComplexityOpen(false);
     setRunnerResult(null);
+    setGradeError(false);
+    setResultDrillSlug(null);
     // Restore Kojo's last feedback for this problem (persisted per slug) so it survives
     // leaving and coming back. A new run overwrites it.
     setGradeFeedback(loadGradeFeedback(problemSlug));
-    resetTimerState();
   }
 
   // Loads (or seeds) a problem's code tabs into state. openProblem calls it, and so does
@@ -4816,6 +4809,10 @@ export default function LeetCodeMode() {
 
   function handleMonacoMount(editor: any, monaco: Monaco) {
     editorRef.current = editor;
+    setCursorSource(editor);
+    // LeetCode's shortcuts. Monaco would otherwise insert a line on Ctrl+Enter.
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => shortcutsRef.current.submit?.());
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Quote, () => shortcutsRef.current.run?.());
 
     // Monaco measures glyph widths at mount using whatever font is available
     // then. JetBrains Mono loads asynchronously (Google Fonts, display=swap),
@@ -4925,7 +4922,7 @@ export default function LeetCodeMode() {
 
 
   async function handleRunCode(preview = false) {
-    if (!currentProblem || !currentProblemData || !isRunnable(currentProblemData)) return null;
+    if (!currentProblem) return null;
     const problemAtRun = currentProblem;
     return runAndGradeCurrentCode(problemAtRun, currentCode, currentProblemData, currentCustomCases, !trail, preview);
   }
@@ -5183,6 +5180,56 @@ export default function LeetCodeMode() {
         </div>
 
         <div className="lc-settings-section">
+          <span className="lc-settings-label">Code editor color</span>
+          <p className="lc-settings-help">Black is the default. LeetCode uses its softer gray editor; Light uses Nosey's sage.</p>
+          <div className="lc-settings-segmented" role="group" aria-label="Code editor color">
+            {EDITOR_COLORS.map((item) => (
+              <button
+                key={item.value}
+                type="button"
+                className={`lc-settings-seg-btn${editorColor === item.value ? " lc-settings-seg-btn--active" : ""}`}
+                aria-pressed={editorColor === item.value}
+                onClick={() => chooseEditorColor(item.value)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="lc-settings-section">
+          <span className="lc-settings-label">Code font size</span>
+          <div className="lc-settings-segmented" role="group" aria-label="Code font size">
+            {(["small", "medium", "large"] as const).map((size) => (
+              <button
+                key={size}
+                type="button"
+                className={`lc-settings-seg-btn${editorFontSize === size ? " lc-settings-seg-btn--active" : ""}`}
+                aria-pressed={editorFontSize === size}
+                onClick={() => {
+                  setEditorFontSize(size);
+                  saveEditorPref(EDITOR_FONT_KEY, size);
+                }}
+              >
+                {size.charAt(0).toUpperCase() + size.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="lc-settings-section">
+          <span className="lc-settings-label">Wrap long lines</span>
+          <ToggleSwitch
+            checked={editorWrap}
+            label={editorWrap ? "On" : "Off"}
+            onClick={() => {
+              setEditorWrap(!editorWrap);
+              saveEditorPref(EDITOR_WRAP_KEY, editorWrap ? "off" : "on");
+            }}
+          />
+        </div>
+
+        <div className="lc-settings-section">
           <span className="lc-settings-label">Weakness sensitivity</span>
           <p className="lc-settings-help">How aggressively KojoCode flags weak topics.</p>
           <div className="lc-settings-segmented" role="group" aria-label="Weakness sensitivity">
@@ -5273,7 +5320,10 @@ export default function LeetCodeMode() {
 
   // "How hard did that feel?" self-report, shown once after finishing a problem.
   // The answer becomes a weakness signal (hard/brutal add, easy trims the topic).
-  const difficultyModalNode = difficultyPromptSlug ? (
+  // After a Submit in the tabbed editor these two ask inside Test result instead.
+  const promptsInline =
+    inlineCompletion && !classicEditor && view.type === "problem" && currentProblem?.slug === (difficultyPromptSlug ?? drillPromptSlug);
+  const difficultyModalNode = difficultyPromptSlug && !promptsInline ? (
     <div className="modal-backdrop" onMouseDown={dismissDifficultyPrompt}>
       <div
         className="modal-card survey-card lc-difficulty-card"
@@ -5287,14 +5337,7 @@ export default function LeetCodeMode() {
           <h2 className="survey-title">How hard did that feel?</h2>
         </div>
         <div className="lc-difficulty-options">
-          {(
-            [
-              { key: "easy", label: "Easy" },
-              { key: "medium", label: "Just right" },
-              { key: "hard", label: "Hard" },
-              { key: "brutal", label: "Brutal" },
-            ] as const
-          ).map((option) => (
+          {DIFFICULTY_OPTIONS.map((option) => (
             <button
               key={option.key}
               type="button"
@@ -5314,7 +5357,7 @@ export default function LeetCodeMode() {
 
   // "Add this problem to your 3-Pass Drill?" prompt, offered when a problem is marked
   // done and it is not already an open drill.
-  const drillPromptModalNode = drillPromptSlug ? (
+  const drillPromptModalNode = drillPromptSlug && !promptsInline ? (
     <ConfirmModal
       title="Add to your 3-Pass Drill?"
       message="Nosey will resurface this problem up to three times with tightening constraints, so it sticks. You can find it under 3-Pass Drills."
@@ -7225,7 +7268,41 @@ export default function LeetCodeMode() {
   const drillLock = `Locked on pass ${activePass}. Opens after you submit pass 3.`;
 
   // The classic editor (before the tabbed dock, commit 2b7ad80^), kept behind a toggle.
+  // Time's up: a centred card. Keep going leaves the overtime clock running; Submit now
+  // submits the current code the same way the Submit button does.
+  const timeUpNode = timeUp && timeUp.slug === currentProblem.slug ? (
+    <>
+      <div className="lc-kojo-backdrop" onClick={() => setTimeUp(null)} />
+      <EditorDialog className="lc-timeup" labelledBy="lc-timeup-title" onClose={() => setTimeUp(null)}>
+        <div className="lc-timeup-icon" aria-hidden="true">
+          <TimerIcon size={28} />
+        </div>
+        <h2 id="lc-timeup-title">Time's up</h2>
+        <p>
+          {timeUp.minutes ? `Your ${timeUp.minutes} minutes are done. ` : ""}Keep going in overtime, or submit what
+          you have now.
+        </p>
+        <div className="lc-timeup-actions">
+          <Button variant="secondary" onClick={() => setTimeUp(null)}>
+            Keep going
+          </Button>
+          <Button
+            icon={<UploadIcon size={15} />}
+            onClick={() => {
+              setTimeUp(null);
+              if (shortcutsRef.current.submit) shortcutsRef.current.submit();
+              else void handleRunCode();
+            }}
+          >
+            Submit now
+          </Button>
+        </div>
+      </EditorDialog>
+    </>
+  ) : null;
+
   if (classicEditor) {
+    shortcutsRef.current = { run: () => void handleRunCode(), submit: () => void handleRunCode() };
     return (
     <div className="lc-shell lc-shell--editor">
       {/* key forces a remount when switching hub <-> editor: React would otherwise reuse
@@ -7328,16 +7405,7 @@ export default function LeetCodeMode() {
 
           <div className="lc-toolbar-cluster" data-cluster="timer" aria-label="Timer">
             <span className="lc-toolbar-cluster-label">Timer</span>
-            <button
-              type="button"
-              className={`lc-toolbar-btn lc-toolbar-btn--timer lc-toolbar-btn--timer-${timerTone}`}
-              onClick={openTimerPicker}
-              aria-label={timerRemainingSeconds == null ? "Set timer" : `${timerButtonLabel} remaining, click to change timer`}
-              title={timerRemainingSeconds == null ? "Set a problem timer" : `${timerButtonLabel} remaining, click to change timer`}
-            >
-              <TimerRing fraction={timerFraction ?? 1} tone={timerTone} size={18} stroke={2} />
-              <span className="lc-tb-label lc-tb-label--timer">{timerButtonLabel}</span>
-            </button>
+            <ProblemTimer key={currentProblem.slug} timer={problemTimer} onChange={(timer) => setProblemTimer(timer)} onZero={handleTimerZero} />
           </div>
 
           <div className="lc-toolbar-cluster" data-cluster="notes" aria-label="Notes">
@@ -7914,7 +7982,7 @@ export default function LeetCodeMode() {
                             ) : (
                               <div className="lc-cx-diff">
                                 <span className="lc-cx-diff-key">You said</span>
-                                <span className="lc-cx-diff-val lc-cx-diff-val--said">{row.said || "—"}</span>
+                                <span className="lc-cx-diff-val lc-cx-diff-val--said">{row.said || "-"}</span>
                                 <span className="lc-cx-diff-key">Correct</span>
                                 <span className="lc-cx-diff-val lc-cx-diff-val--right">{row.actual || "?"}</span>
                               </div>
@@ -7985,14 +8053,16 @@ export default function LeetCodeMode() {
               defaultValue={currentCode}
               onChange={(value) => handleCodeChange(value ?? "")}
               onMount={handleMonacoMount}
-              theme="vs-dark"
+              beforeMount={defineEditorThemes}
+              theme={editorThemeFor(editorColor)}
               options={{
                 // The code pane starts hidden (display:none) behind the mobile
                 // problem/code toggle, so Monaco first measures a 0-size container.
                 // automaticLayout makes it re-measure when it becomes visible,
                 // otherwise it paints a collapsed black box you cannot type into.
                 automaticLayout: true,
-                fontSize: 14,
+                fontSize: EDITOR_FONT_PX[editorFontSize],
+                wordWrap: editorWrap ? "on" : "off",
                 fontFamily: "Menlo, Consolas, 'Cascadia Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
                 minimap: { enabled: false },
                 // Word-based completion only (finishing identifiers the user already typed).
@@ -8045,58 +8115,6 @@ export default function LeetCodeMode() {
         />
       ) : null}
 
-      {timerPickerOpen ? (
-        <>
-          <div className="lc-kojo-backdrop lc-timer-backdrop" onClick={closeTimerPicker} />
-          <div className="lc-kojo-modal lc-timer-modal" role="dialog" aria-modal="true" aria-labelledby="timer-modal-title">
-            <div className="lc-timer-modal-header">
-              <span className="lc-timer-modal-eyebrow">Interview clock</span>
-              <h2 id="timer-modal-title">How long do you have?</h2>
-              <button type="button" className="lc-kojo-close" onClick={closeTimerPicker} aria-label="Close timer modal">
-                <CloseIcon size={17} />
-              </button>
-            </div>
-
-            <div className="lc-timer-modal-body">
-              <div className="lc-timer-modal-presets" role="group" aria-label="Problem timer presets">
-                {TIMER_PRESETS.map(renderTimerPreset)}
-              </div>
-
-              <div className="lc-timer-modal-divider">
-                <span>or set your own</span>
-              </div>
-
-              <label className="lc-timer-modal-input">
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={timerMinutesInput}
-                  onChange={(event) => setTimerMinutesInput(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      applyTimerFromInput();
-                    }
-                  }}
-                  aria-label="Custom minutes"
-                />
-                <span className="lc-timer-modal-unit">min</span>
-              </label>
-            </div>
-
-            <div className="lc-timer-modal-actions">
-              <button type="button" className="button lc-timeout-action lc-timeout-action--ghost" onClick={closeTimerPicker}>
-                Cancel
-              </button>
-              <button type="button" className="button button-primary lc-timeout-action" onClick={applyTimerFromInput}>
-                Start timer
-              </button>
-            </div>
-          </div>
-        </>
-      ) : null}
-
       {notesOpen ? (
         <>
           <div className="lc-kojo-backdrop" onClick={() => setNotesOpen(false)} />
@@ -8124,50 +8142,7 @@ export default function LeetCodeMode() {
         </>
       ) : null}
 
-      {timeoutModalOpen ? (
-        <>
-          <div className="lc-kojo-backdrop" onClick={closeTimeoutModal} />
-          <div className="lc-kojo-modal lc-timeout-modal">
-            <div className="lc-kojo-modal-header lc-timeout-modal-header">
-              <div className="kojo-avatar lc-timeout-avatar"><AlertIcon size={16} /></div>
-              <span>Time&apos;s up</span>
-              <button
-                type="button"
-                className="lc-kojo-close"
-                onClick={closeTimeoutModal}
-                aria-label="Close timeout modal"
-              >
-                <CloseIcon size={17} />
-              </button>
-            </div>
-
-            <div className="lc-kojo-contract lc-timeout-copy">
-              <p>{timeoutModalMessage ?? "You ran out of time before finishing this problem."}</p>
-              <p>Kojo graded your current attempt. You can clear the active tab or keep working without the timer.</p>
-            </div>
-
-            <div className="lc-timeout-actions">
-              <button
-                type="button"
-                className="button lc-timeout-action lc-timeout-action--ghost"
-                onClick={() => {
-                  clearActiveTabWork();
-                  resetTimerState();
-                }}
-              >
-                Clear all work
-              </button>
-              <button
-                type="button"
-                className="button button-primary lc-timeout-action"
-                onClick={resetTimerState}
-              >
-                Continue without timer
-              </button>
-            </div>
-          </div>
-        </>
-      ) : null}
+      {timeUpNode}
 
       {customModalNode}
       {confirmDeleteNode}
@@ -8178,8 +8153,80 @@ export default function LeetCodeMode() {
     );
   }
 
+  // What follows a submit in the Submissions tab: the difficulty question, the drill
+  // offer and, after an accepted submit, the next problem.
+  const submissionExtras = (
+    <>
+    {inlineCompletion && difficultyPromptSlug === currentProblem.slug ? (
+      <div className="lc-result-prompt" role="group" aria-label="How hard did that feel?">
+        <span>How hard did that feel?</span>
+        <div className="lc-result-prompt-options">
+          {DIFFICULTY_OPTIONS.map((option) => (
+            <Button key={option.key} variant="secondary" onClick={() => handleDifficultyRating(option.key)}>
+              {option.label}
+            </Button>
+          ))}
+          <Button variant="ghost" onClick={dismissDifficultyPrompt}>Skip</Button>
+        </div>
+      </div>
+    ) : null}
+    {inlineCompletion && drillPromptSlug === currentProblem.slug && !difficultyPromptSlug ? (
+      <div className="lc-result-drill">
+        <span>Add this to your 3-pass drill? Nosey brings it back up to three times so it sticks.</span>
+        <div className="button-row">
+          <Button variant="secondary" disabled={drillModalBusy} onClick={() => void handleAddDrillFromCompletion(currentProblem.slug)}>
+            {drillModalBusy ? "Adding drill" : "Add drill"}
+          </Button>
+          <Button variant="ghost" onClick={() => setDrillPromptSlug(null)}>Not now</Button>
+        </div>
+      </div>
+    ) : null}
+    {resultDrillSlug === currentProblem.slug && betaMode && !isGuestSession() && !drills.some((d) => d.problem_slug === currentProblem.slug) ? (
+      <div className="lc-result-drill">
+        <span>Want to revisit this problem?</span>
+        <Button variant="secondary" disabled={drillModalBusy} onClick={() => void handleAddDrillFromCompletion(currentProblem.slug)}>
+          {drillModalBusy ? "Adding drill" : "Add to 3-pass drill"}
+        </Button>
+      </div>
+    ) : null}
+    {latestSubmit?.slug === currentProblem.slug && latestSubmit.ok && (nextProblemInCategory || suggestedNext) ? (
+      <div className="lc-next-problem">
+        <span className="lc-next-problem-eyebrow">
+          {nextProblemInCategory ? "Up next" : `Continue with ${suggestedNext!.category.label}`}
+        </span>
+        <button
+          type="button"
+          className="lc-next-problem-btn"
+          onClick={() => {
+            const target = nextProblemInCategory ?? suggestedNext!.problem;
+            const targetCategoryId = nextProblemInCategory
+              ? currentProblem.categoryId
+              : suggestedNext!.category.id;
+            openProblem(targetCategoryId, target.slug);
+          }}
+        >
+          <div className="lc-next-problem-info">
+            <span className="lc-next-problem-title">
+              {nextProblemInCategory ? nextProblemInCategory.title : suggestedNext!.problem.title}
+            </span>
+          </div>
+          <span
+            className={`lc-difficulty lc-difficulty--${difficultyClass(
+              nextProblemInCategory ? nextProblemInCategory.difficulty : suggestedNext!.problem.difficulty,
+            )}`}
+          >
+            {nextProblemInCategory ? nextProblemInCategory.difficulty : suggestedNext!.problem.difficulty}
+          </span>
+          <ArrowRightIcon size={16} className="lc-next-arrow" />
+        </button>
+      </div>
+    ) : null}
+    </>
+  );
+
   return (
     <div className="lc-shell lc-shell--editor lc-docked">
+      <LeftRail key="editor-rail" active="problems" streak={stats.currentStreak} onNavigate={setView} storageKey={EDITOR_RAIL_COLLAPSE_KEY} defaultCollapsed />
       <div className="lc-editor-shell">
       <EditorDock
         key={scopeKey("editor:" + currentProblem.slug)}
@@ -8201,8 +8248,31 @@ export default function LeetCodeMode() {
                   ? "Kojo opens after this practice session."
                   : undefined,
         }}
-        toolbar={(layoutMenu, select) => (
+        lockActions={{
+          Kojo: interviewRealism && !assistsLocked && !isStreakChallengeProblem ? (
+            <Button variant="secondary" icon={<SettingsIcon size={15} />} onClick={() => setSettingsOpen(true)}>
+              Open settings
+            </Button>
+          ) : undefined,
+        }}
+        toolbar={(layoutMenu, select) => {
+          const run = () => {
+            if (!runnable || runnerLoading) return;
+            select("Test result");
+            void handleRunCode(true);
+          };
+          const submit = async () => {
+            if (!runnable || runnerLoading || trailBusy) return;
+            select(currentCode.trim() ? "Submissions" : "Test result");
+            setInlineCompletion(true);
+            const result = await handleRunCode();
+            if (trail && result) void trailSubmitted(result.ok);
+          };
+          shortcutsRef.current = { run, submit: () => void submit() };
+          const mod = /Mac|iPhone|iPad/.test(navigator.platform) ? "Cmd" : "Ctrl";
+          return (
           <div className="lc-editor-topbar">
+            <div className="lc-topbar-start">
             {/* The category breadcrumb names the technique, so interview realism swaps it for a
                 plain route back to the dashboard. */}
             {trail ? (
@@ -8242,22 +8312,36 @@ export default function LeetCodeMode() {
               </button>
             )}
             <div className="lc-editor-title">
-              <span>{currentProblem.title}</span>
+              <span title={currentProblem.title}>{currentProblem.title}</span>
               <span className={`lc-difficulty lc-difficulty--${difficultyClass(currentProblem.difficulty)}`}>
                 {currentProblem.difficulty}
               </span>
             </div>
-            <div className="lc-dock-tools">
+            </div>
+            <div className="lc-run-group" role="group" aria-label="Run and submit">
               <Button
                 variant="secondary"
+                className="lc-run-btn"
                 disabled={!runnable || runnerLoading}
-                onClick={() => {
-                  select("Test result");
-                  void handleRunCode(true);
-                }}
+                aria-keyshortcuts="Control+'"
+                title={`Run the test cases (${mod}+')`}
+                icon={runnerLoading && runKind === "run" ? <Spinner size="sm" label="Running" /> : <PlayIcon size={15} />}
+                onClick={run}
               >
-                <PlayIcon size={15} /> Run
+                Run
               </Button>
+              <Button
+                className="lc-submit-btn"
+                disabled={!runnable || runnerLoading || trailBusy}
+                aria-keyshortcuts="Control+Enter"
+                title={`Submit for Kojo's feedback (${mod}+Enter)`}
+                icon={runnerLoading && runKind === "submit" ? <Spinner size="sm" label="Submitting" /> : <UploadIcon size={15} />}
+                onClick={() => void submit()}
+              >
+                Submit
+              </Button>
+            </div>
+            <div className="lc-dock-tools">
               {trail ? (
                 <span className={`lc-trail-chip${trailElapsed > trailLimitS * 0.8 ? " is-late" : ""}`}>
                   {trail.kind === "redo" ? "Redo" : "Trail step"}
@@ -8272,32 +8356,7 @@ export default function LeetCodeMode() {
                   onDone={finishTrailStep}
                 />
               ) : null}
-              <Button
-                disabled={!runnable || runnerLoading || trailBusy}
-                onClick={async () => {
-                  select("Test result");
-                  const result = await handleRunCode();
-                  if (trail && result) void trailSubmitted(result.ok);
-                }}
-              >
-                Submit
-              </Button>
-              <button
-                type="button"
-                className={`lc-toolbar-btn lc-toolbar-btn--timer lc-toolbar-btn--timer-${timerTone}`}
-                onClick={openTimerPicker}
-                aria-label={
-                  timerRemainingSeconds == null ? "Set timer" : `${timerButtonLabel} remaining, click to change timer`
-                }
-                title={
-                  timerRemainingSeconds == null
-                    ? "Set a problem timer"
-                    : `${timerButtonLabel} remaining, click to change timer`
-                }
-              >
-                <TimerRing fraction={timerFraction ?? 1} tone={timerTone} size={18} stroke={2} />
-                <span className="lc-tb-label lc-tb-label--timer">{timerButtonLabel}</span>
-              </button>
+              <ProblemTimer key={currentProblem.slug} timer={problemTimer} onChange={(timer) => setProblemTimer(timer)} onZero={handleTimerZero} />
               {activeDrill ? (
                 <div
                   className={`lc-pass-banner lc-pass-banner--p${activePass}`}
@@ -8322,7 +8381,8 @@ export default function LeetCodeMode() {
               {layoutMenu}
             </div>
           </div>
-        )}
+          );
+        }}
         contents={{
           Description: (
             <div className="lc-dock-description">
@@ -8477,218 +8537,32 @@ export default function LeetCodeMode() {
             </div>
           ),
           Testcase: (
-            <div className="lc-tests-panel">
-              <div className="lc-tests-header">
-                <h3>Tests</h3>
-                <button
-                  type="button"
-                  className="lc-add-test-btn"
-                  onClick={addCustomCase}
-                  disabled={currentCustomCases.length >= CUSTOM_TEST_LIMIT}
-                >
-                  <PlusIcon size={14} />
-                  Add custom
-                </button>
-              </div>
-              <p className="muted small">
-                {isCustomProblem
-                  ? "These cases come from this problem. You can add up to 2 ad-hoc cases for a quick run."
-                  : "You can add up to 2 custom cases on top of the official LeetCode examples."}
-              </p>
-
-              <div className="lc-test-list">
-                {officialExamples.map((example) => (
-                  <div key={example.index} className="lc-test-card">
-                    <div className="lc-test-card-top">
-                      <strong>
-                        {isCustomProblem ? "Test" : "Official"} {example.index}
-                      </strong>
-                      {currentCode.trim() && runnable ? (
-                        <button
-                          type="button"
-                          className="lc-visualize-btn"
-                          onClick={() => handleVisualize(example.input_text)}
-                          disabled={visualizerLoading === example.input_text}
-                          title="Step through this test case"
-                        >
-                          {visualizerLoading === example.input_text ? (
-                            <Loader2 size={12} className="spin" />
-                          ) : (
-                            <Eye size={12} />
-                          )}
-                          Visualize
-                        </button>
-                      ) : null}
-                    </div>
-                    <label>
-                      <span>Input</span>
-                      <textarea
-                        value={example.input_text}
-                        readOnly
-                        rows={Math.min(5, Math.max(2, example.input_text.split("\n").length))}
-                      />
-                    </label>
-                    <label>
-                      <span>Expected</span>
-                      <textarea
-                        value={example.output_text}
-                        readOnly
-                        rows={Math.min(4, Math.max(2, example.output_text.split("\n").length))}
-                      />
-                    </label>
-                  </div>
-                ))}
-
-                {currentCustomCases.map((testCase, index) => (
-                  <div key={testCase.id} className="lc-test-card lc-test-card--custom">
-                    <div className="lc-test-card-top">
-                      <strong>Custom {index + 1}</strong>
-                      <div className="lc-test-card-actions">
-                        {currentCode.trim() && runnable && testCase.inputText.trim() ? (
-                          <button
-                            type="button"
-                            className="lc-visualize-btn"
-                            onClick={() => handleVisualize(testCase.inputText)}
-                            disabled={visualizerLoading === testCase.inputText}
-                            title="Step through this test case"
-                          >
-                            {visualizerLoading === testCase.inputText ? (
-                              <Loader2 size={12} className="spin" />
-                            ) : (
-                              <Eye size={12} />
-                            )}
-                            Visualize
-                          </button>
-                        ) : null}
-                        <button
-                          type="button"
-                          className="lc-inline-icon-btn"
-                          onClick={() => removeCustomCase(testCase.id)}
-                          aria-label="Remove custom test case"
-                        >
-                          <CloseIcon size={14} />
-                        </button>
-                      </div>
-                    </div>
-                    <label>
-                      <span>Input</span>
-                      <textarea
-                        value={testCase.inputText}
-                        onChange={(event) => updateCustomCase(testCase.id, "inputText", event.target.value)}
-                        rows={3}
-                        placeholder="nums = [1,2,3], target = 4"
-                      />
-                    </label>
-                    <label>
-                      <span>Expected</span>
-                      <textarea
-                        value={testCase.expectedOutput}
-                        onChange={(event) => updateCustomCase(testCase.id, "expectedOutput", event.target.value)}
-                        rows={2}
-                        placeholder="[0,2]"
-                      />
-                    </label>
-                  </div>
-                ))}
-              </div>
-
-              {!runnable && currentProblem.isOfficial ? (
-                <p className="lc-runner-note">
-                  Automatic running currently supports Python `class Solution` problems with official example inputs.
-                  Design-style problems still open with the official statement and editor, but they do not auto-run yet.
-                </p>
-              ) : null}
-
-              {!runnable && isCustomProblem ? (
-                <p className="lc-runner-note">Add starter code and at least one test case to run this problem.</p>
-              ) : null}
-            </div>
+            <EditorTestCases
+              cases={[
+                ...officialExamples.map((item) => ({ id: "example-" + item.index, label: "Case " + item.index, input: item.input_text, expected: item.output_text })),
+                ...currentCustomCases.map((item, index) => ({ id: item.id, label: "Custom " + (index + 1), input: item.inputText, expected: item.expectedOutput, custom: true })),
+              ]}
+              canAdd={currentCustomCases.length < CUSTOM_TEST_LIMIT}
+              onAdd={addCustomCase}
+              onRemove={removeCustomCase}
+              onChange={updateCustomCase}
+              onVisualize={currentCode.trim() && runnable ? handleVisualize : undefined}
+              visualizing={visualizerLoading}
+              unavailable={!runnable ? "Running needs starter code and at least one problem test case." : undefined}
+            />
           ),
           "Test result": (
             <div aria-live="polite">
               {runnerLoading && !runnerResult ? (
                 <InlineLoading label="Running tests" />
               ) : !runnerResult ? (
-                <p>Run your code to see test results.</p>
+                <EmptyState icon={<CodeIcon size={22} />} title="Ready when you are" body="Run your code to check the test cases. Submit when you are ready for feedback." />
               ) : null}{" "}
-              {runnerResult ? (
-                <div
-                  className={
-                    runnerResult.ok ? "lc-runner-result lc-runner-result--ok" : "lc-runner-result lc-runner-result--error"
-                  }
-                >
-                  <strong>{runnerResult.output}</strong>
-                  {runnerResult.error ? <pre>{runnerResult.error}</pre> : null}
-                  {runnerResult.cases?.length ? (
-                    <div className="lc-runner-case-list">
-                      {runnerResult.cases.map((testCase) => (
-                        <div key={testCase.label} className="lc-runner-case">
-                          <span>{testCase.label}</span>
-                          <span>{testCase.passed ? "Pass" : "Fail"}</span>
-                          {!testCase.passed ? (
-                            <small>
-                              Expected {testCase.expected} but got {testCase.actual}
-                            </small>
-                          ) : null}
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-              {gradeLoading ? (
-                <LoadingNotice
-                  compact
-                  title="Kojo is grading your submission"
-                  estimate="Reading your solution and checking the approach. About 15 seconds."
-                  slowNote="Still reading. A long solution takes Kojo longer to work through."
-                  slowAfterMs={18000}
-                />
-              ) : null}
-              {gradeFeedback && !gradeLoading && !interviewRealism ? (
-                <div className="lc-grade-feedback">
-                  <div className="lc-grade-feedback-header">
-                    <KojoMascot state="idle" />
-                    <span>Kojo's feedback</span>
-                  </div>
-                  <MarkdownContent content={gradeFeedback} />
-                </div>
-              ) : null}
-              {showNextButton && (nextProblemInCategory || suggestedNext) ? (
-                <div className="lc-next-problem">
-                  <span className="lc-next-problem-eyebrow">
-                    {nextProblemInCategory ? "Up next" : `Continue , ${suggestedNext!.category.label}`}
-                  </span>
-                  <button
-                    type="button"
-                    className="lc-next-problem-btn"
-                    onClick={() => {
-                      const target = nextProblemInCategory ?? suggestedNext!.problem;
-                      const targetCategoryId = nextProblemInCategory
-                        ? currentProblem.categoryId
-                        : suggestedNext!.category.id;
-                      openProblem(targetCategoryId, target.slug);
-                    }}
-                  >
-                    <div className="lc-next-problem-info">
-                      <span className="lc-next-problem-title">
-                        {nextProblemInCategory ? nextProblemInCategory.title : suggestedNext!.problem.title}
-                      </span>
-                    </div>
-                    <span
-                      className={`lc-difficulty lc-difficulty--${difficultyClass(
-                        nextProblemInCategory ? nextProblemInCategory.difficulty : suggestedNext!.problem.difficulty,
-                      )}`}
-                    >
-                      {nextProblemInCategory ? nextProblemInCategory.difficulty : suggestedNext!.problem.difficulty}
-                    </span>
-                    <ArrowRightIcon size={16} className="lc-next-arrow" />
-                  </button>
-                </div>
-              ) : null}
+              {runnerResult ? <EditorRunResult result={runnerResult} kind={runKind} /> : null}
             </div>
           ),
-          Complexity: runnerResult?.ok ? (
+          // A solved problem keeps Complexity open after a reload, when no run is on screen.
+          Complexity: (runnerResult ? runnerResult.ok : Boolean(progress[currentProblem.slug])) ? (
             <div className="lc-complexity-body">
               <p className="lc-complexity-intro">
                 Before Kojo weighs in, state the time and space complexity of your solution and explain why. An
@@ -8816,15 +8690,11 @@ export default function LeetCodeMode() {
               ) : null}
             </div>
           ) : (
-            <p>Pass the test cases to check your complexity.</p>
+            <EmptyState icon={<CodeIcon size={22} />} title="Check your approach" body="Pass the test cases, then explain your time and space complexity here." />
           ),
           Code: (
-            <div className="lc-editor-pane">
+            <div className={`lc-editor-pane lc-code-theme--${editorColor}`}>
               <div className="lc-dock-code-tools">
-              <button type="button" className="lc-toolbar-btn" onClick={handleFormat} aria-label="Format code">
-                <WrapText size={16} />
-                <span className="lc-tb-label">Format</span>
-              </button>
               <CodingTabs
                 tabs={(currentCodeWorkspace?.tabs ?? []).map((tab) => {
                   const locked = isTabLockedForDrill(currentProblem.slug, tab);
@@ -8843,40 +8713,36 @@ export default function LeetCodeMode() {
                 onDeleteTab={handleDeleteCodeTab}
                 canAddTab={!drillActive && (currentCodeWorkspace?.tabs?.length ?? 0) < MAX_CODE_TABS}
               />
-
+              <button type="button" className="lc-code-tool" onClick={handleFormat} aria-label="Format code" title="Format code">
+                <WrapText size={16} />
+                <span>Format</span>
+              </button>
               </div>
               <div className="lc-editor-surface">
                 <Editor
                   height="100%"
                   loading={<InlineLoading label="Opening code editor" />}
                   defaultLanguage="python"
-                  // Give each (problem, tab) its own Monaco model via `path`, and seed
-                  // it with `defaultValue` instead of driving `value`. A controlled
-                  // `value` prop makes @monaco-editor/react replace the whole document
-                  // whenever the prop lags Monaco's live buffer by even one keystroke,
-                  // which snaps the caret to the end of the file when typing fast.
-                  // Uncontrolled-per-tab keeps the caret put; state still syncs via onChange.
+                  // Each (problem, tab) gets its own Monaco model via `path`, seeded with
+                  // `defaultValue`, so every file tab keeps its own undo history and the caret
+                  // never jumps while typing fast. State still syncs via onChange.
                   path={`${currentProblem?.slug ?? "none"}:${currentCodeTab?.id ?? "none"}`}
                   defaultValue={currentCode}
                   onChange={(value) => handleCodeChange(value ?? "")}
                   onMount={handleMonacoMount}
-                  theme="vs-dark"
+                  beforeMount={defineEditorThemes}
+                  theme={editorThemeFor(editorColor)}
                   options={{
-                    // The code pane starts hidden (display:none) behind the mobile
-                    // problem/code toggle, so Monaco first measures a 0-size container.
-                    // automaticLayout makes it re-measure when it becomes visible,
-                    // otherwise it paints a collapsed black box you cannot type into.
                     automaticLayout: true,
-                    fontSize: 14,
-                    fontFamily: "Menlo, Consolas, 'Cascadia Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
+                    fontSize: EDITOR_FONT_PX[editorFontSize],
+                    // Nosey's code font; ligatures off so "->" and "!=" read as typed.
+                    fontFamily: "'JetBrains Mono', Menlo, Consolas, 'Cascadia Mono', monospace",
+                    fontLigatures: false,
+                    lineHeight: 1.6,
+                    wordWrap: editorWrap ? "on" : "off",
                     minimap: { enabled: false },
-                    // Word-based completion only (finishing identifiers the user already typed).
-                    // Monaco ships no Python language service, so this is the ONLY completion
-                    // source available here: it can never suggest an algorithm, library method, or
-                    // solution, just the user's own variable/function names + keywords. Kept ON for
-                    // normal practice (spares retyping, matches CoderPad/CodeSignal), but forced OFF
-                    // whenever a 3-pass drill is active so drills stay bare mock-interview realism.
-                    // IntelliSense-style helpers (parameter hints, trigger-char popups) stay off.
+                    // Word-based completion only: the user's own names and keywords, never an
+                    // algorithm or library method. Off during 3-pass drills.
                     quickSuggestions: !drillActive,
                     suggestOnTriggerCharacters: false,
                     parameterHints: { enabled: false },
@@ -8885,10 +8751,17 @@ export default function LeetCodeMode() {
                     scrollBeyondLastLine: false,
                     lineNumbers: "on",
                     renderLineHighlight: "line",
+                    folding: true,
+                    guides: { indentation: true },
                     padding: { top: 16, bottom: 16 },
+                    // The overview ruler draws a cursor tick in the corner; this editor has no use for it.
+                    overviewRulerLanes: 0,
+                    hideCursorInOverviewRuler: true,
+                    overviewRulerBorder: false,
                   }}
                 />
               </div>
+              <EditorStatusBar editor={cursorSource} language="Python" />
             </div>
           ),
           Notes: (
@@ -8899,7 +8772,16 @@ export default function LeetCodeMode() {
             />
           ),
           Submissions: (
-            <EditorSubmissions key={currentProblem.slug} slug={currentProblem.slug} revision={historyRevision} />
+            <EditorSubmissions
+              key={currentProblem.slug}
+              slug={currentProblem.slug}
+              revision={historyRevision}
+              latestAt={latestSubmit?.slug === currentProblem.slug ? latestSubmit.at : null}
+              running={submitRunning}
+              grading={gradeLoading}
+              gradeError={gradeError}
+              extras={submissionExtras}
+            />
           ),
           Solutions: (
             <EditorSolutions
@@ -8962,102 +8844,7 @@ export default function LeetCodeMode() {
         />
       ) : null}
 
-      {timerPickerOpen ? (
-        <>
-          <div className="lc-kojo-backdrop lc-timer-backdrop" onClick={closeTimerPicker} />
-          <div className="lc-kojo-modal lc-timer-modal" role="dialog" aria-modal="true" aria-labelledby="timer-modal-title">
-            <div className="lc-timer-modal-header">
-              <span className="lc-timer-modal-eyebrow">Interview clock</span>
-              <h2 id="timer-modal-title">How long do you have?</h2>
-              <button type="button" className="lc-kojo-close" onClick={closeTimerPicker} aria-label="Close timer modal">
-                <CloseIcon size={17} />
-              </button>
-            </div>
-
-            <div className="lc-timer-modal-body">
-              <div className="lc-timer-modal-presets" role="group" aria-label="Problem timer presets">
-                {TIMER_PRESETS.map(renderTimerPreset)}
-              </div>
-
-              <div className="lc-timer-modal-divider">
-                <span>or set your own</span>
-              </div>
-
-              <label className="lc-timer-modal-input">
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={timerMinutesInput}
-                  onChange={(event) => setTimerMinutesInput(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      applyTimerFromInput();
-                    }
-                  }}
-                  aria-label="Custom minutes"
-                />
-                <span className="lc-timer-modal-unit">min</span>
-              </label>
-            </div>
-
-            <div className="lc-timer-modal-actions">
-              <button type="button" className="button lc-timeout-action lc-timeout-action--ghost" onClick={closeTimerPicker}>
-                Cancel
-              </button>
-              <button type="button" className="button button-primary lc-timeout-action" onClick={applyTimerFromInput}>
-                Start timer
-              </button>
-            </div>
-          </div>
-        </>
-      ) : null}
-
-      {timeoutModalOpen ? (
-        <>
-          <div className="lc-kojo-backdrop" onClick={closeTimeoutModal} />
-          <div className="lc-kojo-modal lc-timeout-modal">
-            <div className="lc-kojo-modal-header lc-timeout-modal-header">
-              <div className="kojo-avatar lc-timeout-avatar"><AlertIcon size={16} /></div>
-              <span>Time&apos;s up</span>
-              <button
-                type="button"
-                className="lc-kojo-close"
-                onClick={closeTimeoutModal}
-                aria-label="Close timeout modal"
-              >
-                <CloseIcon size={17} />
-              </button>
-            </div>
-
-            <div className="lc-kojo-contract lc-timeout-copy">
-              <p>{timeoutModalMessage ?? "You ran out of time before finishing this problem."}</p>
-              <p>Kojo graded your current attempt. You can clear the active tab or keep working without the timer.</p>
-            </div>
-
-            <div className="lc-timeout-actions">
-              <button
-                type="button"
-                className="button lc-timeout-action lc-timeout-action--ghost"
-                onClick={() => {
-                  clearActiveTabWork();
-                  resetTimerState();
-                }}
-              >
-                Clear all work
-              </button>
-              <button
-                type="button"
-                className="button button-primary lc-timeout-action"
-                onClick={resetTimerState}
-              >
-                Continue without timer
-              </button>
-            </div>
-          </div>
-        </>
-      ) : null}
+      {timeUpNode}
 
       {customModalNode}
       {confirmDeleteNode}

@@ -39,3 +39,15 @@ describe("CodingTabs locks", () => {
     expect(screen.queryByLabelText("Delete Tab 1")).toBeNull();
   });
 });
+
+describe("CodingTabs close", () => {
+  it("never offers to close the only file", () => {
+    render(<CodingTabs tabs={[{ id: "a", name: "Tab 1" }]} activeTabId="a" onSelectTab={() => {}} onAddTab={() => {}} onDeleteTab={() => {}} />);
+    expect(screen.queryByLabelText("Delete Tab 1")).toBeNull();
+  });
+  it("offers close on every unlocked file once there are two", () => {
+    render(<CodingTabs tabs={[{ id: "a", name: "Tab 1" }, { id: "b", name: "Tab 2" }]} activeTabId="a" onSelectTab={() => {}} onAddTab={() => {}} onDeleteTab={() => {}} />);
+    expect(screen.getByLabelText("Delete Tab 1")).toBeTruthy();
+    expect(screen.getByLabelText("Delete Tab 2")).toBeTruthy();
+  });
+});

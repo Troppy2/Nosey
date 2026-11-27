@@ -1,0 +1,477 @@
+/* The dock owns structure; this route sheet follows legacy CSS intentionally. */
+.lc-shell.lc-docked {
+  flex-direction: row;
+  align-items: stretch;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+.lc-docked .lc-editor-shell {
+  width: 0;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--white);
+}
+/* Top bar, LeetCode style: problem on the left, Run and Submit centred, tools on the right.
+   Three grid columns keep the action group centred whatever the title length. */
+.lc-docked .lc-editor-topbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  gap: var(--space-3);
+  min-height: 56px;
+  background: var(--white);
+  border-bottom: 1px solid var(--gray-200);
+}
+.lc-topbar-start { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }
+.lc-docked .lc-editor-title { display: flex; align-items: center; gap: var(--space-2); flex: 1 1 auto; min-width: 0; font-size: var(--text-sm); font-weight: 600; overflow-wrap: normal; }
+.lc-docked .lc-editor-title > span:first-child { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lc-docked .lc-editor-title > .lc-difficulty { flex: none; }
+.lc-docked .lc-back-btn { display: inline-flex; align-items: center; flex: none; min-height: 40px; padding: var(--space-2); }
+.lc-docked .lc-dock-tools { display: flex; flex-wrap: wrap; justify-content: flex-end; justify-self: end; align-items: center; gap: var(--space-2); width: auto; min-width: 0; }
+.lc-docked .lc-dock-tools > .lc-toolbar-btn { min-height: 40px; }
+.lc-docked .lc-dock-tools > .lc-pass-banner,
+.lc-docked .lc-dock-tools > .lc-trail-chip { max-width: 100%; }
+/* Run and Submit: one joined control. Run is the quiet preview, Submit the one solid
+   green action, so it reads as the commitment. */
+.lc-run-group { display: inline-flex; align-items: stretch; gap: 2px; padding: 3px; border-radius: var(--radius-md); background: var(--green-lightest); border: 1px solid var(--gray-200); }
+.lc-run-group > .button { min-height: 36px; min-width: 0; padding: var(--space-1) var(--space-4); gap: var(--space-2); border: 0; border-radius: var(--radius-sm); box-shadow: none; font-size: var(--text-sm); font-weight: 600; white-space: nowrap; }
+.lc-run-group > .lc-run-btn { background: transparent; color: var(--ink); }
+.lc-run-group > .lc-run-btn:hover:enabled { background: var(--white); }
+.lc-run-group > .lc-submit-btn { background: var(--accent-positive); color: var(--white); }
+.lc-run-group > .lc-submit-btn:hover:enabled { background: var(--accent-positive-strong); }
+.lc-run-group > .button:disabled { opacity: 0.55; cursor: not-allowed; }
+.lc-run-group > .lc-submit-btn .loader { border-color: color-mix(in srgb, var(--white) 35%, transparent); border-top-color: var(--white); }
+.lc-docked .lc-run-group > .button:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+/* Workspace: a soft sage desk under white panes, so panes read as sheets on a surface. */
+.lc-docked .lc-dock { --lc-strip-height: 44px; padding: var(--space-2); background: color-mix(in srgb, var(--green-lightest) 70%, var(--white)); }
+.lc-docked .lc-dock-panel { border-color: var(--gray-200); box-shadow: var(--shadow-sm); }
+.lc-docked .lc-dock-head { background: var(--white); border-color: var(--gray-200); border-radius: var(--radius-md) var(--radius-md) 0 0; }
+/* Pane tabs: rounded chips inside the header, like the file tabs. The open tab is a soft
+   sage chip with a green icon; the rest are quiet text that tints on hover. */
+.lc-docked .lc-dock-tab { height: 32px; padding-inline: var(--space-2); border-radius: var(--radius-md); font-size: var(--text-xs); font-weight: 500; transition: background var(--transition-fast), color var(--transition-fast); }
+.lc-docked .lc-dock-tab:hover { background: color-mix(in srgb, var(--green-lightest) 70%, var(--white)); color: var(--ink); }
+.lc-docked .lc-dock-tab[draggable="true"] { cursor: grab; }
+.lc-docked .lc-dock-tab[draggable="true"]:active { cursor: grabbing; }
+.lc-docked .lc-dock-tab--drop { box-shadow: inset 3px 0 var(--accent-positive-strong); }
+.lc-docked .lc-dock-tab[aria-selected="true"],
+.lc-docked .lc-dock-more.is-active { color: var(--ink); background: var(--green-lightest); font-weight: 600; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--green-dark) 18%, transparent); }
+.lc-docked .lc-dock-tab[aria-selected="true"] > svg,
+.lc-docked .lc-dock-more.is-active > svg { color: var(--green-dark); }
+.lc-docked .lc-dock-more { width: 80px; flex: 0 0 80px; }
+.lc-docked .lc-dock-more > span { min-width: 0; }
+.lc-docked .lc-dock-more > svg { flex: none; }
+.lc-docked .lc-dock-head .button { min-width: 36px; min-height: 40px; height: 40px; }
+.lc-docked .lc-dock-actions { flex-wrap: nowrap; }
+.lc-docked .lc-dock-menu-item { min-height: 40px; }
+.lc-docked .lc-dock-pop { max-width: min(320px, 85vw); }
+/* Divider: a quiet gutter at rest. Hover shows a full-length line with a grab handle in
+   the middle; dragging (or keyboard focus) turns both the darker green. */
+.lc-docked .lc-dock-divider { flex-basis: 10px; position: relative; background: transparent; }
+.lc-docked .lc-dock-divider::before { content: ""; position: absolute; inset: 0 3px; border-radius: var(--radius-pill); background: transparent; transition: background var(--transition-fast); }
+.lc-docked .lc-dock-column > .lc-dock-divider::before { inset: 3px 0; }
+.lc-docked .lc-dock-divider::after { content: ""; position: absolute; inset: calc(50% - 16px) 2px; border-radius: var(--radius-pill); background: transparent; transition: background var(--transition-fast); }
+.lc-docked .lc-dock-column > .lc-dock-divider::after { inset: 2px calc(50% - 16px); }
+.lc-docked .lc-dock-divider:hover,
+.lc-docked .lc-dock-divider:focus-visible { background: transparent; outline: none; }
+.lc-docked .lc-dock-divider:hover::before { background: var(--green-light); }
+.lc-docked .lc-dock-divider:hover::after { background: var(--green-mid); }
+.lc-docked .lc-dock-divider:active::before,
+.lc-docked .lc-dock-divider:focus-visible::before { background: var(--green-mid); }
+.lc-docked .lc-dock-divider:active::after,
+.lc-docked .lc-dock-divider:focus-visible::after { background: var(--green-dark); }
+.lc-docked .lc-dock-content { overscroll-behavior: contain; padding: var(--space-4); }
+.lc-docked .lc-dock-content:has(.lc-editor-pane),
+.lc-docked .lc-dock-content:has(.kojo-panel) { padding: 0; }
+/* Monaco measures its own wrapper, which grows with Monaco, so it never shrinks when the
+   pane gets shorter and the last lines are cut off. Pinning the wrapper to the surface
+   gives it the real size to measure (a zero flex basis beats its inline height: 100%). */
+.lc-docked .lc-editor-surface { display: flex; flex-direction: column; overflow: hidden; }
+.lc-docked .lc-editor-surface > section { flex: 1 1 0; min-height: 0; }
+/* Monaco can scroll an overflow:hidden ancestor to reveal its caret, hiding the file tabs. */
+.lc-docked .lc-dock-content:has(.lc-editor-pane),
+.lc-docked .lc-dock-content .lc-editor-pane { overflow: clip; }
+/* Only tall tools fill their host. Natural-height text avoids padding overflow. */
+.lc-docked .lc-dock-mount,
+.lc-docked .lc-dock-mount > div { height: auto; }
+.lc-docked .lc-dock-content:has(.lc-editor-pane) .lc-dock-mount,
+.lc-docked .lc-dock-content:has(.lc-editor-pane) .lc-dock-mount > div,
+.lc-docked .lc-dock-content:has(.kojo-panel) .lc-dock-mount,
+.lc-docked .lc-dock-content:has(.kojo-panel) .lc-dock-mount > div { height: 100%; }
+.lc-docked .lc-dock-content:has(.lc-editor-notes) { display: flex; padding: 0; overflow: hidden; }
+.lc-docked .lc-dock-content:has(.lc-editor-notes) .lc-dock-mount,
+.lc-docked .lc-dock-content:has(.lc-editor-notes) .lc-dock-mount > div { height: 100%; }
+.lc-editor-notes { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+/* Notes: a formatting bar like LeetCode's, in Nosey's sage. Glyph buttons on the
+   left, save status and a Write / Preview switch on the right. */
+.lc-notes-toolbar { display: flex; align-items: center; gap: var(--space-2); min-height: 44px; padding: var(--space-1) var(--space-2); border-bottom: 1px solid var(--gray-200); background: var(--white); }
+.lc-notes-format { display: flex; flex-wrap: wrap; align-items: center; min-width: 0; }
+.lc-notes-format-group { display: flex; align-items: center; gap: 2px; }
+.lc-notes-format-group + .lc-notes-format-group { margin-left: var(--space-1); padding-left: var(--space-1); border-left: 1px solid var(--gray-200); }
+.lc-notes-fmt { display: grid; place-items: center; min-width: 30px; height: 30px; padding: 0 var(--space-1); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font: 600 var(--text-sm) / 1 var(--font-sans); cursor: pointer; transition: background var(--transition-fast), color var(--transition-fast); }
+.lc-notes-fmt:hover:enabled { background: var(--green-lightest); color: var(--ink); }
+.lc-notes-fmt:active:enabled { background: var(--green-light); }
+.lc-notes-fmt:disabled { opacity: 0.4; cursor: default; }
+.lc-notes-fmt.is-heading { font-family: var(--font-serif); font-weight: 700; font-size: var(--text-base); }
+.lc-notes-fmt.is-bold { font-weight: 800; }
+.lc-notes-fmt.is-italic { font-family: var(--font-serif); font-style: italic; font-size: var(--text-base); }
+.lc-notes-fmt.is-quote { font-family: var(--font-serif); font-size: var(--text-xl); padding-top: 6px; }
+.lc-notes-fmt.is-code { font-family: var(--font-mono); font-size: var(--text-xs); }
+.lc-notes-fmt.is-link { font-size: var(--text-xs); text-decoration: underline; text-underline-offset: 2px; }
+.lc-notes-mode { display: inline-flex; flex: none; margin-left: auto; padding: 2px; border: 1px solid var(--gray-200); border-radius: var(--radius-md); background: var(--green-lightest); }
+.lc-notes-mode > button { min-height: 28px; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font: 500 var(--text-xs) var(--font-sans); cursor: pointer; }
+.lc-notes-mode > button:hover { color: var(--ink); }
+.lc-notes-mode > button[aria-pressed="true"] { background: var(--white); color: var(--ink); font-weight: 600; box-shadow: var(--shadow-sm); }
+@media (max-width: 760px), (hover: none) and (pointer: coarse) and (max-device-width: 1100px) {
+  .lc-notes-fmt { min-width: 40px; height: 40px; }
+  .lc-notes-mode > button { min-height: 40px; }
+}
+.lc-editor-notes > .md-live { flex: 1; min-height: 0; }
+.lc-docked .lc-editor-notes .cm-editor { border: 0; border-radius: 0; height: 100%; min-height: 0; background: var(--white); box-shadow: none; }
+.lc-docked .lc-editor-notes .cm-editor.cm-focused { outline: none; border: 0; box-shadow: none; }
+/* The caret shows where you are typing; no box around the writing surface. */
+.lc-docked .lc-editor-notes .md-live :is(:focus, :focus-visible) { outline: none; }
+.lc-docked .lc-dock-content:has(.lc-editor-notes):focus-visible { outline: none; }
+.lc-notes-format { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.lc-notes-format::-webkit-scrollbar { display: none; }
+.lc-docked .lc-editor-notes .cm-content { padding: var(--space-4); font: var(--text-sm) / 1.7 var(--font-sans); caret-color: var(--green-dark); }
+.lc-docked .lc-editor-notes .cm-placeholder { color: var(--muted); opacity: 0.75; }
+.lc-notes-preview { padding: var(--space-4); overflow: auto; min-height: 0; }
+.lc-docked .lc-dock-content .lc-editor-pane { min-height: 0; }
+.lc-docked .lc-dock-content:has(.empty-state),
+.lc-docked .lc-dock-content:has(.lc-dock-lock) { display: grid; align-content: center; }
+.lc-docked .empty-state,
+.lc-docked .lc-dock-lock { margin: 0; padding: var(--space-5); border: 0; border-radius: 0; background: transparent; box-shadow: none; height: auto; }
+.lc-docked .empty-state h2 { font: 600 var(--text-base) var(--font-sans); margin-block: var(--space-2); }
+.lc-docked .empty-state p { margin: 0; max-width: 36ch; font-size: var(--text-sm); }
+.lc-docked .empty-icon { background: var(--green-lightest); color: var(--green-dark); }
+.lc-docked .lc-dock-lock { font-size: var(--text-sm); line-height: 1.6; }
+.lc-docked .lc-dock-lock > p { margin: 0; max-width: 36ch; }
+.lc-docked .lc-problem-heading { font-size: var(--text-xl); line-height: 1.4; margin-block: var(--space-4); }
+.lc-docked .lc-problem-source { flex-wrap: wrap; gap: var(--space-2); font-size: var(--text-xs); }
+.lc-docked .lc-problem-source a,
+.lc-docked .lc-sol-link { display: inline-flex; align-items: center; min-height: 40px; }
+.lc-docked .lc-sol .button { white-space: normal; overflow-wrap: normal; }
+.lc-docked .lc-sol-head { flex-wrap: wrap; }
+.lc-docked .lc-sol-intro .button-row { align-items: stretch; }
+/* Grid tracks must be able to shrink, or the solution code widens the whole pane. */
+.lc-docked :is(.lc-sol, .lc-sol-list, .lc-sol-item .settings-collapsible-body) { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.lc-docked :is(.lc-sol-list > li, .lc-sol-item) { min-width: 0; }
+/* Read-only code uses the light Kojo chat block (see .pt-writeup-code). */
+.lc-docked .lc-sol .kojo-code-block { max-width: 100%; overflow: auto; border-color: var(--border); background: color-mix(in srgb, var(--green-dark) 10%, transparent); color: var(--ink); }
+.lc-docked .lc-runner-result { margin: 0; padding: var(--space-3); border-radius: var(--radius-sm); }
+.lc-docked .lc-runner-result > strong { display: block; font-size: var(--text-base); }
+.lc-result-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.lc-result-summary > strong { font-size: var(--text-sm); }
+.lc-result-summary > span { font-size: var(--text-xs); color: var(--muted); }
+.lc-result-error { font-size: var(--text-sm); line-height: 1.6; }
+.lc-docked .lc-runner-result .lc-case-tabs { margin-top: var(--space-2); }
+.lc-result-dot { width: 6px; height: 6px; border-radius: var(--radius-pill); margin-right: var(--space-2); flex: none; }
+.lc-result-dot.is-passed { background: var(--accent-positive); }
+.lc-result-dot.is-failed { background: var(--accent-danger); }
+.lc-result-detail { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--space-2); margin-top: var(--space-2); }
+.lc-result-detail > .lc-result-input { grid-column: 1 / -1; }
+.lc-docked .lc-result-detail pre.is-wrong { color: var(--accent-danger-strong); }
+.lc-docked .lc-runner-result--ok .lc-result-summary > strong { color: var(--accent-positive-strong); font-size: var(--text-lg); }
+.lc-docked .lc-runner-result--error .lc-result-summary > strong { color: var(--accent-danger-strong); font-size: var(--text-lg); }
+
+.lc-result-detail > div { min-width: 0; }
+.lc-result-detail > div > span { font-size: var(--text-xs); color: var(--muted); }
+.lc-docked .lc-result-detail pre { margin: var(--space-1) 0 0; padding: var(--space-2); background: var(--white); border-radius: var(--radius-xs); font-size: var(--text-xs); }
+.lc-docked .lc-runner-result pre { white-space: pre-wrap; font-family: var(--font-mono); font-size: var(--text-xs); }
+.lc-docked .lc-runner-case-list { margin-top: var(--space-3); display: grid; gap: var(--space-2); }
+.lc-docked .lc-runner-case { padding: var(--space-2); font-size: var(--text-xs); }
+.lc-docked .lc-runner-case small { overflow-wrap: anywhere; }
+.lc-docked :is(.lc-result-drill, .lc-result-prompt) { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--gray-200); font-size: var(--text-sm); }
+.lc-docked .lc-result-drill .button-row { margin: 0; gap: var(--space-1); }
+.lc-result-prompt-options { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.lc-docked .lc-result-prompt-options > .button { min-height: 36px; padding: var(--space-1) var(--space-3); font-size: var(--text-xs); }
+/* Sentence case and readable contrast for labels the legacy sheets set in caps. */
+.lc-docked :is(.lc-next-problem-eyebrow, .lc-complexity-label) { text-transform: none; letter-spacing: normal; color: var(--muted); font-size: var(--text-xs); font-weight: 600; }
+.lc-docked .lc-toolbar-btn--done { border-color: color-mix(in srgb, var(--accent-positive) 40%, transparent); background: var(--accent-positive-tint); color: var(--accent-positive-strong); }
+.lc-feedback-note { color: var(--muted); font-size: var(--text-sm); line-height: 1.6; }
+.lc-docked .lc-next-problem { margin-top: var(--space-4); }
+/* Code pane, LeetCode style with Nosey's palette: a slim white toolbar (file tabs as
+   compact chips on one row, Format on the right), the editor on white, a status bar. */
+.lc-docked .lc-dock-code-tools { flex: none; min-height: 40px; gap: var(--space-2); padding: 0 var(--space-2); background: var(--lc-code-chrome, var(--white)); border-bottom: 1px solid var(--lc-code-line, var(--gray-200)); }
+.lc-shell--editor .lc-code-tabs { flex: 1; min-width: 0; min-height: 40px; gap: 2px; align-items: center; padding: 0; border: 0; background: transparent; overflow: hidden; }
+.lc-shell--editor .lc-code-tabs__list { flex-wrap: nowrap; align-items: center; gap: 2px; padding: 0; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+.lc-shell--editor .lc-code-tabs__list::-webkit-scrollbar { display: none; }
+.lc-shell--editor .lc-file-tab { display: flex; flex: 0 0 auto; align-items: center; max-width: 160px; height: 30px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--lc-code-chrome-muted, var(--muted)); transition: background var(--transition-fast), color var(--transition-fast); }
+.lc-shell--editor .lc-file-tab:hover { background: var(--lc-code-chrome-hover, var(--green-lightest)); color: var(--lc-code-chrome-fg, var(--ink)); }
+.lc-shell--editor .lc-file-tab.is-active { background: var(--lc-code-chip, var(--green-lightest)); color: var(--lc-code-chrome-fg, var(--ink)); box-shadow: inset 0 0 0 1px var(--lc-code-chip-ring, color-mix(in srgb, var(--green-dark) 22%, transparent)); }
+.lc-shell--editor .lc-coding-tab { flex: 1; min-width: 0; height: 30px; min-height: 30px; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-md); background: transparent; color: inherit; font: 500 var(--text-xs) var(--font-sans); box-shadow: none; }
+.lc-shell--editor .lc-file-tab:has(.lc-file-close) .lc-coding-tab { padding-right: var(--space-1); }
+.lc-shell--editor .lc-coding-tab > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lc-shell--editor .lc-coding-tab--active { font-weight: 600; }
+.lc-shell--editor .lc-coding-tab:hover:enabled { background: transparent; }
+/* Close shows on the open file and on hover, like browser tabs, so idle tabs stay quiet. */
+.lc-shell--editor .lc-file-close { display: grid; place-items: center; flex: none; width: 20px; height: 20px; min-width: 20px; min-height: 20px; margin-right: var(--space-1); padding: 0; border: 0; border-radius: var(--radius-xs); background: transparent; color: var(--lc-code-chrome-muted, var(--muted)); cursor: pointer; opacity: 0; transition: opacity var(--transition-fast); }
+.lc-shell--editor .lc-file-tab:hover .lc-file-close,
+.lc-shell--editor .lc-file-tab.is-active .lc-file-close,
+.lc-shell--editor .lc-file-close:focus-visible { opacity: 1; }
+.lc-shell--editor .lc-file-close:hover { background: var(--lc-code-chrome-hover, var(--green-light)); color: var(--lc-code-chrome-fg, var(--ink)); }
+.lc-shell--editor .lc-coding-tab--add { flex: 0 0 30px; width: 30px; min-width: 30px; height: 30px; min-height: 30px; justify-content: center; padding: 0; border-radius: var(--radius-md); background: transparent; color: var(--lc-code-chrome-muted, var(--muted)); }
+.lc-shell--editor .lc-coding-tab--add:hover:enabled { background: var(--lc-code-chrome-hover, var(--green-lightest)); color: var(--lc-code-chrome-fg, var(--ink)); }
+.lc-code-tool { display: inline-flex; align-items: center; gap: var(--space-1); flex: none; height: 30px; padding: 0 var(--space-2); border: 0; border-radius: var(--radius-md); background: transparent; color: var(--lc-code-chrome-muted, var(--muted)); font: 500 var(--text-xs) var(--font-sans); cursor: pointer; transition: background var(--transition-fast), color var(--transition-fast); }
+.lc-code-tool:hover { background: var(--lc-code-chrome-hover, var(--green-lightest)); color: var(--lc-code-chrome-fg, var(--ink)); }
+.lc-code-tool:active { background: var(--lc-code-chip, var(--green-light)); }
+.lc-code-status { display: flex; align-items: center; justify-content: space-between; flex: none; min-height: 28px; padding: 0 var(--space-3); border-top: 1px solid var(--lc-code-line, var(--gray-200)); background: var(--lc-code-chrome, var(--white)); color: var(--lc-code-chrome-muted, var(--muted)); font-size: var(--text-xs); }
+.lc-code-status-pos { margin-left: var(--space-3); font-variant-numeric: tabular-nums; }
+@container (max-width: 420px) {
+  .lc-code-tool > span { display: none; }
+}
+@media (max-width: 760px), (hover: none) and (pointer: coarse) and (max-device-width: 1100px) {
+  .lc-docked .lc-dock-code-tools { min-height: 52px; }
+  .lc-docked .lc-file-tab, .lc-docked .lc-coding-tab { height: 40px; min-height: 40px; }
+  .lc-docked .lc-file-close { width: 32px; height: 32px; min-width: 32px; min-height: 32px; opacity: 1; }
+  .lc-docked .lc-coding-tab--add, .lc-code-tool { width: auto; min-width: 44px; height: 44px; min-height: 44px; justify-content: center; }
+}
+/* Compact test-case selector with a single editable case surface. */
+.lc-testcases { display: grid; gap: var(--space-3); }
+.lc-case-toolbar { display: flex; min-width: 0; gap: var(--space-1); }
+.lc-case-tabs { display: flex; min-width: 0; gap: var(--space-2); overflow-x: auto; padding: 2px; }
+.lc-case-tabs > button,
+.lc-case-add,
+.lc-case-meta button { display: inline-flex; align-items: center; justify-content: center; flex: none; min-height: 40px; padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: transparent; color: var(--muted); font-size: var(--text-xs); cursor: pointer; white-space: nowrap; }
+.lc-case-tabs > button[aria-selected="true"] { background: var(--green-lightest); color: var(--ink); font-weight: 600; }
+.lc-case-tabs > button:hover,
+.lc-case-add:hover:enabled,
+.lc-case-meta button:hover:enabled { background: var(--green-light); }
+.lc-case-add { min-width: 40px; padding: var(--space-2); }
+.lc-case-add:disabled { opacity: .45; cursor: not-allowed; }
+.lc-case-fields { display: grid; gap: var(--space-3); }
+.lc-case-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; color: var(--muted); font-size: var(--text-xs); }
+.lc-case-meta > div { display: flex; }
+.lc-case-fields label { display: grid; gap: var(--space-2); font-size: var(--text-xs); color: var(--muted); }
+.lc-case-fields textarea { width: 100%; min-width: 0; padding: var(--space-3); border: 1px solid var(--gray-200); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--green-lightest) 35%, var(--white)); color: var(--ink); font: var(--text-sm)/1.5 var(--font-mono); resize: vertical; }
+.lc-case-fields textarea:read-only { resize: none; }
+/* Keep visible focus inside clipped strips without sacrificing the whole ring. */
+.lc-docked :is(button, a, input, textarea, [tabindex]):focus-visible { outline: 2px solid var(--accent-positive-strong); outline-offset: -3px; }
+.lc-docked .lc-dock-strip { gap: 0; padding: 0 var(--space-1); }
+.lc-docked .lc-dock-tab:active { background: var(--green-light); }
+.lc-docked .lc-kojo-close { min-width: 44px; min-height: 44px; }
+body:has(.lc-docked) .toast-host { top: auto; bottom: max(16px, env(safe-area-inset-bottom)); right: 16px; max-height: 35dvh; overflow-y: auto; }
+body:has(.lc-docked) .toast-close { min-width: 44px; min-height: 44px; }
+/* KojoCode's existing rail stays vertical, including on the phone one-pane view. */
+.lc-docked > .lc-rail { display: flex; flex-direction: column; flex: none; height: 100dvh; min-height: 0; max-height: 100dvh; position: relative; top: auto; overflow-x: hidden; overflow-y: auto; padding: var(--space-2) 0; background: var(--white); mask-image: none; border: 0; border-right: 1px solid var(--gray-200); }
+.lc-docked > .lc-rail .lc-rail-header { display: flex; flex: none; margin: 0; padding: var(--space-2); }
+.lc-docked > .lc-rail .lc-rail-nav { flex-direction: column; padding: var(--space-1); gap: var(--space-1); }
+.lc-docked > .lc-rail .lc-rail-item { min-height: 44px; flex: none; }
+.lc-docked > .lc-rail .lc-rail-streak { margin: auto var(--space-1) 0; padding: var(--space-2); }
+@media (max-width: 1100px) {
+  /* Retain the existing app sidebar beside the editor instead of its tablet topbar. */
+  .shell:not(.shell--mobile):has(.lc-docked) { display: grid; grid-template-columns: 64px minmax(0, 1fr); }
+  .shell:has(.lc-docked) > .sidebar { position: sticky; top: 0; width: 64px; height: 100dvh; flex-direction: column; padding: var(--space-3) var(--space-1); gap: var(--space-3); transform: none; opacity: 1; pointer-events: auto; }
+  .shell:has(.lc-docked) > .sidebar .sidebar-header { display: flex; flex-direction: column; }
+  .shell:has(.lc-docked) > .sidebar .brand-copy,
+  .shell:has(.lc-docked) > .sidebar .nav-label,
+  .shell:has(.lc-docked) > .sidebar .sidebar-collapse-btn { display: none; }
+  .shell:has(.lc-docked) > .sidebar .brand-lockup { padding: 0; }
+  .shell:has(.lc-docked) > .sidebar .sidebar-nav { display: flex; flex-direction: column; gap: var(--space-2); width: 100%; }
+  .shell:has(.lc-docked) > .sidebar .nav-link { display: flex; justify-content: center; width: 100%; min-height: 44px; padding: var(--space-2); }
+  .lc-docked .lc-dock-tools { width: 100%; }
+  .lc-docked .lc-editor-title { flex-basis: 0; }
+  .lc-docked .lc-dock-code-tools .lc-tb-label { display: none; }
+}
+@media (max-width: 900px) {
+  .lc-docked > .lc-rail,
+  .lc-docked > .lc-rail[data-collapsed] { width: 52px; min-width: 52px; max-width: 52px; align-items: stretch; }
+  .lc-docked > .lc-rail .lc-rail-brand,
+  .lc-docked > .lc-rail .lc-rail-item-label,
+  .lc-docked > .lc-rail .lc-rail-collapse-btn,
+  .lc-docked > .lc-rail .lc-rail-streak { display: none; }
+  .lc-docked > .lc-rail .lc-rail-back-btn { display: inline-flex; min-width: 44px; min-height: 44px; }
+  .lc-docked > .lc-rail .lc-rail-header { padding: var(--space-1); }
+  .lc-docked > .lc-rail .lc-rail-item { justify-content: center; padding: var(--space-2); }
+}
+@media (max-width: 760px), (hover: none) and (pointer: coarse) and (max-device-width: 1100px) {
+  .lc-docked .lc-editor-topbar { padding: var(--space-1) var(--space-2); }
+  .lc-docked .lc-editor-title { gap: var(--space-1); }
+  .lc-docked .lc-editor-title > .lc-difficulty { display: none; }
+  .lc-docked .lc-dock-tools { gap: var(--space-1); }
+  .lc-docked .lc-editor-topbar { grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--space-2); min-height: 52px; }
+  .lc-docked .lc-back-btn { min-width: 44px; min-height: 44px; justify-content: center; }
+  .lc-run-group > .button { min-height: 44px; padding-inline: var(--space-3); }
+  .lc-docked .lc-dock-menu-item { min-height: 44px; }
+  .lc-docked .lc-dock-tools > .lc-toolbar-btn { min-width: 44px; min-height: 44px; padding: var(--space-1); font-size: var(--text-xs); }
+  .lc-docked .lc-dock { padding: var(--space-1); }
+  .lc-docked .lc-dock-content { padding: var(--space-3); }
+  .lc-docked .lc-dock { --lc-strip-height: 52px; }
+  .lc-docked .lc-dock-tab { height: 44px; min-height: 44px; padding-inline: var(--space-2); }
+  .lc-docked .lc-dock-tab > svg { display: none; }
+  .lc-docked .lc-dock-more > svg { display: block; }
+  .lc-docked .lc-dock-more { width: 76px; flex-basis: 76px; }
+  .lc-docked .lc-case-tabs > button,
+  .lc-docked .lc-case-add,
+  .lc-docked .lc-case-meta button { min-height: 44px; }
+  .lc-docked .lc-pass-banner { display: flex; flex-wrap: wrap; width: 100%; }
+  body:has(.lc-docked) .toast-host { width: calc(100vw - 84px); right: 12px; }
+}
+
+/* Narrow phones: the words carry Run and Submit, so the problem title keeps its room. */
+@media (max-width: 480px) {
+  .lc-run-group > .button > svg { display: none; }
+}
+@media (max-width: 360px) {
+  .lc-docked .lc-editor-title { display: none; }
+}
+/* Code block language label in sentence case, not the shared all-caps tag. */
+.lc-docked .lc-sol .kojo-code-lang { text-transform: capitalize; letter-spacing: normal; }
+/* A narrow left pane puts the verdict badges under the approach name instead of
+   squeezing the name to one word per line. */
+.lc-docked .lc-dock-content { container-type: inline-size; }
+@container (max-width: 360px) {
+  .lc-sol-item .settings-collapsible-header { flex-wrap: wrap; }
+  .lc-sol-item .settings-collapsible-title { flex-basis: calc(100% - 32px); }
+  .lc-sol-item .settings-collapsible-meta { order: 3; }
+}
+
+/* Test result, LeetCode style: no tinted card. The verdict colour carries the state,
+   cases are quiet chips, and Input / Output / Expected stack as sage code wells. */
+.lc-docked .lc-runner-result,
+.lc-docked .lc-runner-result--ok,
+.lc-docked .lc-runner-result--error,
+.lc-docked .lc-runner-result--notice { margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.lc-docked .lc-result-summary { align-items: baseline; }
+.lc-docked .lc-result-summary > strong { display: inline; margin: 0; font-size: var(--text-xl); font-weight: 700; color: var(--ink); }
+.lc-docked .lc-runner-result--ok .lc-result-summary > strong { color: var(--accent-positive-strong); font-size: var(--text-xl); }
+.lc-docked .lc-runner-result--error .lc-result-summary > strong { color: var(--accent-danger-strong); font-size: var(--text-xl); }
+.lc-docked .lc-runner-result--notice .lc-result-summary > strong { color: var(--accent-caution-strong); }
+.lc-docked .lc-result-summary > span { font-size: var(--text-sm); }
+/* The message to read (a Python error or a pre-run check) sits in its own tinted well. */
+.lc-docked .lc-result-error { margin: var(--space-3) 0 0; padding: var(--space-3); border-radius: var(--radius-md); background: var(--accent-danger-tint); color: var(--accent-danger-strong); font: var(--text-sm)/1.6 var(--font-mono); white-space: pre-wrap; }
+.lc-docked .lc-runner-result--notice .lc-result-error { background: var(--accent-caution-tint); color: var(--accent-caution-strong); font-family: var(--font-sans); }
+.lc-docked .lc-runner-result .lc-case-tabs { margin-top: var(--space-3); gap: var(--space-1); padding: 0; }
+.lc-docked .lc-runner-result .lc-case-tabs > button { min-height: 36px; padding: var(--space-1) var(--space-3); border-radius: var(--radius-md); color: var(--muted); font-weight: 500; }
+.lc-docked .lc-runner-result .lc-case-tabs > button:hover { background: color-mix(in srgb, var(--green-dark) 8%, var(--white)); }
+.lc-docked .lc-runner-result .lc-case-tabs > button[aria-selected="true"] { background: color-mix(in srgb, var(--green-dark) 14%, var(--white)); color: var(--ink); font-weight: 600; }
+.lc-docked .lc-result-dot { width: 7px; height: 7px; }
+.lc-docked .lc-result-dot.is-passed { background: var(--accent-positive); }
+.lc-docked .lc-result-dot.is-failed { background: var(--accent-danger); }
+.lc-docked .lc-result-detail { grid-template-columns: minmax(0, 1fr); gap: var(--space-3); margin-top: var(--space-3); }
+.lc-docked .lc-result-detail > div > span { display: block; margin-bottom: var(--space-1); color: var(--muted); font-size: var(--text-xs); font-weight: 600; }
+.lc-docked .lc-result-detail pre { margin: 0; padding: var(--space-2) var(--space-3); border: 0; border-radius: var(--radius-md); background: color-mix(in srgb, var(--green-dark) 8%, var(--white)); color: var(--ink); font: var(--text-sm)/1.5 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.lc-docked .lc-result-detail pre.is-wrong { color: var(--accent-danger-strong); }
+@media (max-width: 760px), (hover: none) and (pointer: coarse) and (max-device-width: 1100px) {
+  .lc-docked .lc-runner-result .lc-case-tabs > button { min-height: 44px; }
+}
+
+/* Solutions header: heading left, the two ways to watch it solved as quiet links right. */
+.lc-docked .lc-sol-head { align-items: center; }
+.lc-sol-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
+.lc-docked .lc-sol-action { display: inline-flex; align-items: center; gap: var(--space-1); min-height: 32px; padding: var(--space-1) var(--space-2); border: 0; border-radius: var(--radius-md); background: transparent; color: var(--green-dark); font: 600 var(--text-sm) var(--font-sans); text-decoration: none; cursor: pointer; transition: background var(--transition-fast), color var(--transition-fast); }
+.lc-docked .lc-sol-action:hover { background: var(--green-lightest); color: var(--ink); }
+.lc-docked .lc-sol-action:active { background: var(--green-light); }
+.lc-docked .lc-sol-item { transition: border-color var(--transition-fast); }
+.lc-docked .lc-sol-item:hover { border-color: var(--green-mid); }
+.lc-docked .lc-sol-item .settings-collapsible-header { cursor: pointer; }
+@media (max-width: 760px), (hover: none) and (pointer: coarse) and (max-device-width: 1100px) {
+  .lc-docked .lc-sol-action { min-height: 44px; }
+}
+
+/* KojoCode rail beside the editor: a compact activity bar. Square icon buttons on one
+   axis, a soft active tint instead of a solid capsule, a small streak at the foot. */
+.lc-docked > .lc-rail[data-collapsed="true"] { width: 56px; min-width: 56px; max-width: 56px; align-items: center; padding: var(--space-2) 0; }
+.lc-docked > .lc-rail[data-collapsed="true"] .lc-rail-header { justify-content: center; margin: 0 0 var(--space-2); padding: 0; }
+.lc-docked > .lc-rail[data-collapsed="true"] .lc-rail-collapse-btn { width: 32px; height: 32px; border-color: transparent; background: transparent; }
+.lc-docked > .lc-rail[data-collapsed="true"] .lc-rail-collapse-btn:hover { background: var(--green-lightest); }
+.lc-docked > .lc-rail[data-collapsed="true"] .lc-rail-nav { align-items: center; padding: 0; gap: var(--space-1); }
+.lc-docked > .lc-rail[data-collapsed="true"] .lc-rail-item { width: 40px; height: 40px; min-height: 40px; padding: 0; justify-content: center; border-radius: var(--radius-md); }
+.lc-docked > .lc-rail .lc-rail-item.is-active,
+.lc-docked > .lc-rail .lc-rail-item.is-active:hover { background: var(--green-lightest); color: var(--green-dark); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--green-dark) 25%, transparent); }
+.lc-docked > .lc-rail[data-collapsed="true"] .lc-rail-streak { width: 40px; margin: auto 0 0; padding: var(--space-1) 0; gap: 0; border: 0; border-radius: var(--radius-md); background: transparent; }
+.lc-docked > .lc-rail[data-collapsed="true"] .lc-rail-streak strong { font-size: var(--text-sm); }
+@media (max-width: 760px), (hover: none) and (pointer: coarse) and (max-device-width: 1100px) {
+  .lc-docked > .lc-rail[data-collapsed="true"] .lc-rail-item { width: 44px; height: 44px; min-height: 44px; }
+}
+
+/* Pane bodies follow the pane's rounded corners (the code pane's status bar was square). */
+.lc-docked .lc-dock-panel > .lc-dock-content { border-radius: 0 0 calc(var(--radius-md) - 1px) calc(var(--radius-md) - 1px); }
+
+
+/* Code pane chrome palettes, matching the Monaco themes in lib/monacoTheme.ts, so the
+   toolbar and status bar change colour with the editor.
+   Light is built from Nosey's tokens. Black and LeetCode copy those editors' own dark
+   palettes (Monaco's dark theme and LeetCode's gray), which have no Nosey token. */
+.lc-code-theme--light {
+  --lc-code-bg: var(--white);
+  --lc-code-fg: var(--ink);
+  --lc-code-gutter: var(--green-mid);
+  --lc-code-active: color-mix(in srgb, var(--green-lightest) 55%, var(--white));
+  --lc-code-caret: var(--green-dark);
+  --lc-code-selection: color-mix(in srgb, var(--green-light) 75%, transparent);
+  --lc-code-match: var(--green-lightest);
+  --lc-code-line: var(--gray-200);
+  --lc-code-guide: var(--green-lightest);
+  --lc-code-guide-active: var(--green-light);
+  --lc-code-chrome: var(--white);
+  --lc-code-chrome-fg: var(--ink);
+  --lc-code-chrome-muted: var(--muted);
+  --lc-code-chrome-hover: var(--green-lightest);
+  --lc-code-chip: var(--green-lightest);
+  --lc-code-chip-ring: color-mix(in srgb, var(--green-dark) 22%, transparent);
+  --lc-syn-keyword: var(--accent-positive-strong);
+  --lc-syn-string: var(--accent-caution-strong);
+  --lc-syn-number: var(--accent-info-strong);
+  --lc-syn-comment: var(--muted);
+  --lc-syn-function: var(--accent-info);
+  --lc-syn-type: var(--green-dark);
+  --lc-syn-property: var(--ink);
+  --lc-syn-punct: var(--muted);
+}
+.lc-code-theme--black,
+.lc-code-theme--leetcode {
+  --lc-code-fg: #d4d4d4;
+  --lc-code-gutter: #858585;
+  --lc-code-caret: #aeafad;
+  --lc-code-selection: #264f78;
+  --lc-code-guide: #3c3c3c;
+  --lc-code-guide-active: #6b6b6b;
+  --lc-code-chrome-fg: #e6e6e6;
+  --lc-code-chrome-muted: #a0a0a0;
+  --lc-code-chip-ring: #ffffff26;
+  --lc-syn-keyword: #569cd6;
+  --lc-syn-string: #ce9178;
+  --lc-syn-number: #b5cea8;
+  --lc-syn-comment: #6a9955;
+  --lc-syn-function: #dcdcaa;
+  --lc-syn-type: #4ec9b0;
+  --lc-syn-property: #9cdcfe;
+  --lc-syn-punct: #d4d4d4;
+}
+.lc-code-theme--black {
+  --lc-code-bg: #1e1e1e;
+  --lc-code-active: #282828;
+  --lc-code-match: #3a3d41;
+  --lc-code-line: #333333;
+  --lc-code-chrome: #252526;
+  --lc-code-chrome-hover: #2f2f30;
+  --lc-code-chip: #37373d;
+}
+.lc-code-theme--leetcode {
+  --lc-code-bg: #262626;
+  --lc-code-active: #2f2f2f;
+  --lc-code-match: #3d3d3d;
+  --lc-code-line: #3a3a3a;
+  --lc-code-chrome: #303030;
+  --lc-code-chrome-hover: #3a3a3a;
+  --lc-code-chip: #404040;
+}
+
+/* Junction: where the row divider meets the column divider, one square grabs both. */
+.lc-dock-junction { position: absolute; top: -4px; z-index: 2; width: 18px; height: 18px; border-radius: var(--radius-sm); cursor: move; touch-action: none; }
+.lc-dock-junction--start { left: -14px; }
+.lc-dock-junction--end { right: -14px; }
+.lc-dock-junction::after { content: ""; position: absolute; inset: 5px; border-radius: var(--radius-pill); background: transparent; transition: background var(--transition-fast); }
+.lc-dock-junction:hover::after,
+.lc-dock-junction:active::after { background: var(--green-dark); }
+/* Hovering the junction lights both lines, so it is clear both will move. */
+.lc-docked .lc-dock-divider:has(> .lc-dock-junction:hover)::before,
+.lc-docked .lc-dock-split:has(> .lc-dock-slot > .lc-dock-column > .lc-dock-divider > .lc-dock-junction:hover) > .lc-dock-divider::before { background: var(--green-light); }
+.lc-docked .lc-dock-divider:has(> .lc-dock-junction:active)::before,
+.lc-docked .lc-dock-split:has(> .lc-dock-slot > .lc-dock-column > .lc-dock-divider > .lc-dock-junction:active) > .lc-dock-divider::before { background: var(--green-mid); }
+
+.lc-sub-extras:not(:empty) { display: grid; margin-bottom: var(--space-3); }

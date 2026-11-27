@@ -8,6 +8,7 @@ import "./styles/layout.css";
 import "./styles/styles.css";
 import "./icons/icons.css";
 import "./styles/components/mobile-shell.css";
+import "./styles/pages/kojocode-editor.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

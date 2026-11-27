@@ -40,11 +40,17 @@ export type RunnerResult = {
   ok: boolean;
   output: string;
   error?: string;
+  /** A check before running (no code yet), not a failure of the user's code. */
+  notice?: boolean;
+  /** Time spent running the test cases in the browser runner, in milliseconds. */
+  runtime_ms?: number;
   cases?: Array<{
     label: string;
     passed: boolean;
     actual: string;
     expected: string;
+    /** The case's input, filled in by the editor for display. */
+    input?: string;
   }>;
 };
 
@@ -366,8 +372,12 @@ try:
     _ret = signature.return_annotation
     returns_nodes = annotation_mentions(_ret, "ListNode") or annotation_mentions(_ret, "TreeNode")
 
+    _run_started = _time.perf_counter()
     for case in test_cases:
-        raw_args = parse_named_args(case["inputText"])
+        try:
+            raw_args = parse_named_args(case["inputText"])
+        except Exception:
+            raise ValueError(f"Couldn't read the input for {case['label']}. Write it like the examples, for example nums = [1, 2], target = 3.")
         if len(raw_args) != len(parameters):
             raise ValueError(f"Couldn't match the testcase input to the Python method signature for {case['label']}.")
         args = []
@@ -391,6 +401,7 @@ try:
             "expected": repr(expected),
         })
 
+    RESULT["runtime_ms"] = round((_time.perf_counter() - _run_started) * 1000, 1)
     RESULT["ok"] = all(case["passed"] for case in RESULT["cases"])
     RESULT["output"] = "All tests passed." if RESULT["ok"] else "Some tests failed."
 except Exception:

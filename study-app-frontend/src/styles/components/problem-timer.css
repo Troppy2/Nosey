@@ -1,0 +1,158 @@
+/* Editor timer: one joined control (clock, pause, restart) like the Run / Submit group,
+   tinted by state, with a small dropdown for the mode and length. */
+.lc-ptimer {
+  position: relative;
+  flex: none;
+}
+.lc-ptimer-bar {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  color: var(--ink);
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+.lc-ptimer-bar.is-idle { color: var(--muted); }
+.lc-ptimer-bar.is-paused { color: var(--muted); }
+.lc-ptimer-bar.is-calm { background: var(--green-lightest); }
+.lc-ptimer-bar.is-warn { background: var(--accent-caution-tint); border-color: color-mix(in srgb, var(--accent-caution) 30%, transparent); color: var(--accent-caution-strong); }
+.lc-ptimer-bar.is-alert,
+.lc-ptimer-bar.is-over { background: var(--accent-danger-tint); border-color: color-mix(in srgb, var(--accent-danger) 30%, transparent); color: var(--accent-danger-strong); }
+.lc-ptimer-clock,
+.lc-ptimer-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 34px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: 600 var(--text-sm) var(--font-sans);
+  cursor: pointer;
+}
+.lc-ptimer-clock { padding-inline: var(--space-2) var(--space-3); }
+.lc-ptimer-btn { min-width: 34px; }
+.lc-ptimer-btn--text { font-size: var(--text-xs); }
+.lc-ptimer-clock:hover,
+.lc-ptimer-btn:hover { background: color-mix(in srgb, var(--white) 60%, transparent); }
+.lc-ptimer-time { font-variant-numeric: tabular-nums; min-width: 4ch; text-align: left; }
+.lc-ptimer-ring-track { stroke: color-mix(in srgb, currentColor 22%, transparent); }
+.lc-ptimer-ring-fill { stroke: currentColor; transition: stroke-dashoffset 0.25s linear; }
+.lc-ptimer-ring.is-calm .lc-ptimer-ring-fill { stroke: var(--green-dark); }
+
+.lc-ptimer-pop {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  z-index: 30;
+  display: grid;
+  gap: var(--space-3);
+  width: min(300px, calc(100vw - 24px));
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--white);
+  box-shadow: var(--shadow-lg);
+}
+.lc-ptimer-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 2px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  background: var(--green-lightest);
+}
+.lc-ptimer-modes > button {
+  min-height: 32px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font: 500 var(--text-sm) var(--font-sans);
+  cursor: pointer;
+}
+.lc-ptimer-modes > button[aria-pressed="true"] { background: var(--white); color: var(--ink); font-weight: 600; box-shadow: var(--shadow-sm); }
+.lc-ptimer-presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); }
+.lc-ptimer-preset {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  padding: var(--space-2) var(--space-1);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+.lc-ptimer-preset:hover { background: var(--green-lightest); border-color: var(--green-mid); }
+.lc-ptimer-preset > strong { font-size: var(--text-sm); }
+.lc-ptimer-preset > span { color: var(--muted); font-size: var(--text-xs); }
+.lc-ptimer-custom { display: flex; align-items: flex-end; gap: var(--space-2); }
+.lc-ptimer-custom > :first-child { flex: 1; min-width: 0; margin: 0; }
+.lc-ptimer-custom .input { min-height: 40px; }
+.lc-ptimer-custom > .button { min-height: 40px; padding-block: 0; }
+.lc-ptimer-stopwatch { display: grid; gap: var(--space-2); }
+.lc-ptimer-stopwatch > p { margin: 0; color: var(--muted); font-size: var(--text-sm); }
+.lc-ptimer-pop .button { min-height: 40px; }
+.lc-ptimer-stop { width: 100%; }
+
+/* Time's up: a centred card over a dim workspace. Big enough to notice, one clear choice. */
+.lc-timeup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 401;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  width: min(400px, calc(100vw - 32px));
+  padding: var(--space-6) var(--space-5) var(--space-5);
+  border-radius: var(--radius-xl);
+  background: var(--white);
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+  transform: translate(-50%, -50%);
+  animation: lc-timeup-in 220ms ease-out;
+}
+.lc-timeup-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-danger-tint);
+  color: var(--accent-danger-strong);
+}
+.lc-timeup h2 { margin: 0; font: 700 var(--text-xl) var(--font-sans); color: var(--ink); }
+.lc-timeup p { margin: 0; max-width: 32ch; color: var(--muted); font-size: var(--text-sm); line-height: 1.6; }
+.lc-timeup-actions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); width: 100%; margin-top: var(--space-2); }
+.lc-timeup-actions > .button { min-height: 44px; }
+@keyframes lc-timeup-in {
+  from { opacity: 0; transform: translate(-50%, -46%) scale(0.98); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lc-timeup { animation: none; }
+}
+@media (max-width: 760px), (hover: none) and (pointer: coarse) and (max-device-width: 1100px) {
+  .lc-ptimer-clock, .lc-ptimer-btn { min-height: 44px; min-width: 44px; }
+  .lc-ptimer-modes > button, .lc-ptimer-preset { min-height: 44px; }
+}
+/* On a phone an idle timer is just its icon; a running one keeps its clock. */
+@media (max-width: 480px) {
+  .lc-ptimer-bar.is-idle .lc-ptimer-time { display: none; }
+}
+.lc-ptimer-pop-controls { display: none; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+/* Phones: only the clock stays in the toolbar; the dropdown is a full-width sheet under it. */
+@media (max-width: 560px) {
+  .lc-ptimer-bar > .lc-ptimer-btn { display: none; }
+  .lc-ptimer-pop-controls { display: grid; }
+  .lc-ptimer-pop { position: fixed; top: 60px; left: 12px; right: 12px; width: auto; z-index: 60; }
+}

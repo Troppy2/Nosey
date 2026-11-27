@@ -1,0 +1,21 @@
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, expect, it, vi } from "vitest";
+import { EditorDialog } from "./EditorDialog";
+afterEach(cleanup);
+it("contains keyboard focus, closes on Escape and restores the invoking control", () => {
+  const trigger = document.createElement("button");
+  document.body.appendChild(trigger);
+  trigger.focus();
+  const close = vi.fn();
+  const { unmount } = render(<EditorDialog className="dialog" labelledBy="title" onClose={close}><h2 id="title">Timer</h2><button>First</button><button>Last</button></EditorDialog>);
+  expect(document.activeElement).toBe(screen.getByText("First"));
+  fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
+  expect(document.activeElement).toBe(screen.getByText("Last"));
+  fireEvent.keyDown(document, { key: "Tab" });
+  expect(document.activeElement).toBe(screen.getByText("First"));
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(close).toHaveBeenCalledOnce();
+  unmount();
+  expect(document.activeElement).toBe(trigger);
+  trigger.remove();
+});

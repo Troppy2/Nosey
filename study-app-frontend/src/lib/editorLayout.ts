@@ -44,7 +44,8 @@ export function initialLayout(): Layout {
         kind: "split",
         id: "rows",
         axis: "column",
-        ratio: 0.66,
+        // LeetCode-like: the test pane gets enough room for a case and its result.
+        ratio: 0.55,
         a: panel("code", ["Code"]),
         b: panel("bottom", ["Testcase", "Test result", "Complexity"]),
       },
@@ -56,6 +57,26 @@ export function panels(node: Node): Panel[] {
     ? [node]
     : [...panels(node.a), ...panels(node.b)];
 }
+/** Fixed panes retain saved split sizes, but never restore moved or folded tabs. */
+export function readFixedLayout(raw: string | null): Layout {
+  const saved = readLayout(raw);
+  const fixed = initialLayout();
+  function restore(node: Node): Node {
+    if (node.kind === "panel") {
+      const old = panels(saved.root).find((item) => item.id === node.id);
+      const compatible = old && old.tabs.length === node.tabs.length && old.tabs.every((tab) => node.tabs.includes(tab));
+      const items = compatible ? old.tabs : node.tabs;
+      return { ...node, tabs: items, active: old && items.includes(old.active) ? old.active : node.active };
+    }
+    const axis = node.axis;
+    function ratio(old: Node): number | undefined {
+      if (old.kind === "panel") return undefined;
+      return old.id === node.id && old.axis === axis ? old.ratio : ratio(old.a) ?? ratio(old.b);
+    }
+    return { ...node, ratio: ratio(saved.root) ?? node.ratio, a: restore(node.a), b: restore(node.b) };
+  }
+  return { root: restore(fixed.root), max: null };
+}
 function transform(node: Node, fn: (node: Node) => Node | null): Node | null {
   if (node.kind === "panel") return fn(node);
   const a = transform(node.a, fn);
@@ -64,12 +85,23 @@ function transform(node: Node, fn: (node: Node) => Node | null): Node | null {
 }
 export type Action =
   | { type: "reset" }
+  | { type: "reorder"; id: string; tab: Tab; before?: Tab }
   | { type: "select"; tab: Tab }
   | { type: "max" | "collapse"; id: string }
   | { type: "resize"; id: string; ratio: number }
   | { type: "move"; tab: Tab; to: string; edge: Edge; before?: Tab };
 export function reduceLayout(state: Layout, action: Action): Layout {
   if (action.type === "reset") return initialLayout();
+  if (action.type === "reorder") {
+    const root = transform(state.root, (node) => {
+      if (node.kind !== "panel" || node.id !== action.id || !node.tabs.includes(action.tab) || action.before === action.tab || (action.before && !node.tabs.includes(action.before))) return node;
+      const items = node.tabs.filter((tab) => tab !== action.tab);
+      const index = action.before ? items.indexOf(action.before) : items.length;
+      items.splice(index, 0, action.tab);
+      return { ...node, tabs: items };
+    });
+    return root ? { ...state, root } : state;
+  }
   if (action.type === "max") {
     if (state.max === action.id) return { ...state, max: null };
     const target = panels(state.root).find((panel) => panel.id === action.id);

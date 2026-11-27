@@ -3,25 +3,43 @@ import {
   fetchLCNotes,
   syncLCNotes,
   fetchSolutionWalkthrough,
-  listLCTestRuns,
   isGuestSession,
   scopeKey,
 } from "../lib/api";
 import { toast } from "../lib/toast";
 import type {
-  LCTestRunSummary,
   SolutionWalkthroughResponse,
   WalkApproach,
 } from "../lib/types";
 import "../styles/components/markdown-answer.css";
 import MarkdownLiveEditor from "./MarkdownLiveEditor";
+import type { EditorState, TransactionSpec } from "@codemirror/state";
+import type { EditorView } from "@codemirror/view";
+import { formatSelection, insertLink, toggleLines } from "../lib/markdownFormat";
 import { Button } from "./Button";
-import { SkeletonList } from "./Skeletons";
 import { LoadingNotice } from "./Loaders";
 import { CollapsibleSection } from "./CollapsibleSection";
 import { MarkdownContent } from "./MarkdownContent";
-import { EmptyState } from "./EmptyState";
-import { HistoryIcon, PlayIcon } from "../icons";
+import { PlayIcon } from "../icons";
+
+type NoteFormat = { label: string; glyph: string; kind: string; run: (state: EditorState) => TransactionSpec };
+// Text glyphs, like the selection bar in MarkdownLiveEditor: each shows what it applies.
+const NOTE_FORMATS: NoteFormat[][] = [
+  [
+    { label: "Heading", glyph: "H", kind: "heading", run: (s) => toggleLines(s, "heading") },
+    { label: "Bold (Ctrl+B)", glyph: "B", kind: "bold", run: (s) => formatSelection(s, "bold") },
+    { label: "Italic (Ctrl+I)", glyph: "I", kind: "italic", run: (s) => formatSelection(s, "italic") },
+  ],
+  [
+    { label: "Numbered list", glyph: "1.", kind: "numbered", run: (s) => toggleLines(s, "numbered") },
+    { label: "Bulleted list", glyph: "•", kind: "bullet", run: (s) => toggleLines(s, "bullet") },
+    { label: "Quote", glyph: "“", kind: "quote", run: (s) => toggleLines(s, "quote") },
+  ],
+  [
+    { label: "Code (Ctrl+E)", glyph: "</>", kind: "code", run: (s) => formatSelection(s, "code") },
+    { label: "Link", glyph: "Link", kind: "link", run: insertLink },
+  ],
+];
 
 // Storage can be blocked (private mode, full quota): notes still work for the page.
 function readNote(key: string): string | null {
@@ -31,11 +49,12 @@ function readNote(key: string): string | null {
     return null;
   }
 }
-function writeNote(key: string, value: string) {
+function writeNote(key: string, value: string): boolean {
   try {
     localStorage.setItem(key, value);
+    return true;
   } catch {
-    /* kept in memory and synced to the account */
+    return false;
   }
 }
 
@@ -52,6 +71,15 @@ export function EditorNotes({
   const pending = useRef<ReturnType<typeof setTimeout>>();
   const chain = useRef(Promise.resolve());
   const account = scopeKey("notes");
+  const [preview, setPreview] = useState(false);
+  const view = useRef<EditorView | null>(null);
+  function format(run: NoteFormat["run"]) {
+    const editor = view.current;
+    if (!editor) return;
+    editor.dispatch(run(editor.state), { scrollIntoView: true, userEvent: "input.format" });
+    editor.focus();
+  }
+  const [saveStatus, setSaveStatus] = useState("Private notes");
   useEffect(() => {
     let live = true;
     if (!readNote(storageKey) && !isGuestSession()) {
@@ -75,89 +103,74 @@ export function EditorNotes({
     edited.current = true;
     latest.current = next;
     setValue(next);
-    writeNote(storageKey, next);
+    const saved = writeNote(storageKey, next);
+    setSaveStatus(saved ? "Saved on this device" : "Device storage unavailable");
     clearTimeout(pending.current);
-    if (!isGuestSession())
+    if (!isGuestSession()) {
+      setSaveStatus("Saving...");
       pending.current = setTimeout(() => {
         chain.current = chain.current
           .then(() => {
-            if (scopeKey("notes") === account) return syncLCNotes(slug, latest.current);
+            if (scopeKey("notes") === account) {
+              const snapshot = latest.current;
+              return syncLCNotes(slug, snapshot).then(() => {
+                if (latest.current === snapshot) setSaveStatus("Saved");
+              });
+            }
           })
           .catch(() => {
+            setSaveStatus(saved ? "Saved on this device. Sync unavailable" : "Could not save notes");
             toast.error(
-              "Notes saved on this device",
-              "Could not sync to your account.",
+              saved ? "Notes saved on this device" : "Could not save notes",
+              saved ? "Could not sync to your account." : "Keep this page open and copy your notes before leaving.",
             );
           });
       }, 600);
+    }
   }
   return (
+    <div className="lc-editor-notes">
+      <div className="lc-notes-toolbar">
+        <div className="lc-notes-format" role="toolbar" aria-label="Format notes">
+          {NOTE_FORMATS.map((group, index) => (
+            <div key={index} className="lc-notes-format-group">
+              {group.map((item) => (
+                <button
+                  key={item.kind}
+                  type="button"
+                  className={"lc-notes-fmt is-" + item.kind}
+                  title={item.label}
+                  aria-label={item.label}
+                  disabled={preview}
+                  // Keep the editor's selection: the press never takes focus.
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => format(item.run)}
+                >
+                  {item.glyph}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+        <div className="lc-notes-mode" role="group" aria-label="Notes view">
+          <button type="button" aria-pressed={!preview} onClick={() => setPreview(false)}>Write</button>
+          <button type="button" aria-pressed={preview} onClick={() => setPreview(true)}>Preview</button>
+        </div>
+      </div>
+      {preview ? <div className="lc-notes-preview">{value.trim() ? <MarkdownContent content={value} /> : <p className="muted">Your notes will appear here.</p>}</div> : (
     <MarkdownLiveEditor
       label="Problem notes"
-      placeholder="Write your approach or edge cases"
+      placeholder="Write your approach, observations, and edge cases. Markdown is supported."
       value={value}
       onChange={change}
+      viewRef={view}
     />
-  );
-}
-export function EditorSubmissions({
-  slug,
-  revision,
-}: {
-  slug: string;
-  revision: number;
-}) {
-  const [rows, setRows] = useState<LCTestRunSummary[] | null>(null);
-  const [error, setError] = useState(false);
-  const [retry, setRetry] = useState(0);
-  useEffect(() => {
-    let live = true;
-    setError(false);
-    setRows(null);
-    if (!isGuestSession())
-      listLCTestRuns(slug)
-        .then((r) => {
-          if (live) setRows(r);
-        })
-        .catch(() => {
-          if (live) {
-            setError(true);
-            toast.error("Could not load submissions");
-          }
-        });
-    return () => {
-      live = false;
-    };
-  }, [slug, revision, retry]);
-  if (isGuestSession()) return <p>Sign in to keep submission history.</p>;
-  if (error)
-    return (
-      <Button variant="secondary" onClick={() => setRetry((r) => r + 1)}>
-        Retry submissions
-      </Button>
-    );
-  if (!rows) return <SkeletonList rows={3} label="Reading submissions" />;
-  if (!rows.length)
-    return (
-      <EmptyState
-        icon={<HistoryIcon size={22} />}
-        title="No submissions yet"
-        body="Submit your code and each result lands here with its time."
-      />
-    );
-  return (
-    <ol className="lc-run-history">
-      {rows.map((row) => (
-        <li key={row.id}>
-          <strong className={row.passed ? "lc-run-ok" : "lc-run-bad"}>
-            {row.passed ? "Accepted" : "Not accepted"}
-          </strong>
-          <time dateTime={row.run_at}>
-            {new Date(row.run_at).toLocaleString()}
-          </time>
-        </li>
-      ))}
-    </ol>
+      )}
+      <div className="lc-code-status">
+        <span role="status">{saveStatus}</span>
+        <span>Markdown</span>
+      </div>
+    </div>
   );
 }
 const VERDICT_LABEL: Record<WalkApproach["verdict"], string> = {
@@ -210,19 +223,26 @@ export function EditorSolutions({
     <div className="lc-sol">
       <div className="lc-sol-head">
         <h3>Approaches</h3>
-        {!custom && (
-          <a
-            className="lc-sol-link"
-            href={
-              "https://www.youtube.com/results?search_query=neetcode+" +
-              encodeURIComponent(title)
-            }
-            target="_blank"
-            rel="noreferrer"
-          >
-            NeetCode video
-          </a>
-        )}
+        <div className="lc-sol-actions">
+          {data ? (
+            <Button variant="ghost" className="lc-sol-action" icon={<PlayIcon size={13} />} onClick={onWatch}>
+              Watch Kojo solve it
+            </Button>
+          ) : null}
+          {!custom && (
+            <a
+              className="lc-sol-action lc-sol-link"
+              href={
+                "https://www.youtube.com/results?search_query=neetcode+" +
+                encodeURIComponent(title)
+              }
+              target="_blank"
+              rel="noreferrer"
+            >
+              NeetCode video
+            </a>
+          )}
+        </div>
       </div>
       {busy ? (
         <LoadingNotice
@@ -277,9 +297,6 @@ export function EditorSolutions({
               </li>
             ))}
           </ol>
-          <Button variant="secondary" onClick={onWatch}>
-            <PlayIcon size={15} /> Watch Kojo solve it
-          </Button>
         </>
       )}
     </div>
