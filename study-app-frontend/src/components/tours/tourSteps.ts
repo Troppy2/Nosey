@@ -381,4 +381,23 @@ export const TOURS: Record<TourId, TourDef> = {
       },
     ],
   },
+  "pattern-trail-gate": {
+    signedInOnly: true,
+    steps: [
+      {
+        element: t("pt-gate-pick"),
+        title: "Name the technique first",
+        body: "The title and tags are hidden. Read the problem and pick the pattern it needs before the editor opens.",
+        side: "left",
+        align: "start",
+      },
+      {
+        element: t("pt-gate-reason"),
+        title: "Say what gave it away",
+        body: "One line on the cue you spotted. Kojo reads it and tells you if it is the cue that matters. Pick 4 of 5 right to clear the gate.",
+        side: "top",
+        align: "start",
+      },
+    ],
+  },
 };

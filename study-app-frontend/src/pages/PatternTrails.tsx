@@ -21,6 +21,7 @@ import {
 } from "../icons";
 import { fetchTrailMap } from "../lib/api";
 import type { PTMap, PTTopicSummary } from "../lib/types";
+import { gateUrl } from "../lib/trailGate";
 import { useMobileShell } from "../lib/useMobileShell";
 import { gateStatus, initialTopic, percent, redoRunUrl, subtopicStatus, topicProgress } from "../lib/trailView";
 import "../styles/pages/pattern-trails.css";
@@ -216,21 +217,35 @@ export default function PatternTrails() {
                 );
               })}
               <li>
-                <div
-                  className={`pt-path-row pt-gate-row is-${topic.gate.cleared ? "cleared" : topic.gate.state}`}
-                  aria-disabled={topic.gate.state === "locked" || topic.gate.state === "cooldown"}
-                >
-                  <span className="pt-gate-mark" aria-hidden="true">
-                    ?
-                  </span>
-                  <span className="pt-path-text">
-                    <b>{topic.title} gate</b>
-                    <span>{gateStatus(topic.gate)}</span>
-                  </span>
-                  <span className="pt-gate-need">
-                    Need {topic.gate.need} of {topic.gate.size}
-                  </span>
-                </div>
+                {(() => {
+                  const gate = topic.gate;
+                  const playable = gate.state === "open" || gate.state === "in_progress";
+                  const className = `pt-path-row pt-gate-row is-${gate.cleared ? "cleared" : gate.state}`;
+                  const row = (
+                    <>
+                      <span className="pt-gate-mark" aria-hidden="true">
+                        ?
+                      </span>
+                      <span className="pt-path-text">
+                        <b>{topic.title} gate</b>
+                        <span>{gateStatus(gate)}</span>
+                      </span>
+                      <span className="pt-gate-need">
+                        Need {gate.need} of {gate.size}
+                      </span>
+                    </>
+                  );
+                  return playable ? (
+                    <Link to={gateUrl(topic.slug, gate.state === "in_progress" ? gate.attempt_id : null)} className={className}>
+                      {row}
+                      <ChevronRightIcon size={18} className="pt-path-chev" />
+                    </Link>
+                  ) : (
+                    <div className={className} aria-disabled="true">
+                      {row}
+                    </div>
+                  );
+                })()}
               </li>
             </ol>
             {nextPath ? (

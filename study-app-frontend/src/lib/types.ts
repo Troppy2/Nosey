@@ -1670,3 +1670,57 @@ export type PTPath = {
 };
 
 export type PTRedoList = { due: PTRedo[]; waiting: PTRedo[] };
+
+/** One gate problem. Never carries the problem slug, title or tags; after the pick it
+ * carries the verdict, the right pattern and the cue. */
+export type PTGateItem = {
+  id: number;
+  position: number;
+  difficulty: string;
+  time_limit_s: number;
+  picked_key: string | null;
+  correct: boolean | null;
+  right_pattern: PTPattern | null;
+  cue: string | null;
+  kojo_note: string | null;
+  solved: boolean | null;
+  seconds: number | null;
+};
+
+export type PTGateAttempt = {
+  attempt_id: number;
+  topic_slug: string;
+  topic_title: string;
+  started_at: string;
+  finished_at: string | null;
+  picks_made: number;
+  correct_count: number;
+  need: number;
+  passed: boolean | null;
+  locked_until: string | null;
+  options: PTPattern[];
+  items: PTGateItem[];
+};
+
+/** A gate item's statement: no title, slug or tags. */
+export type PTGateProblem = {
+  item_id: number;
+  difficulty: string;
+  statement_text: string | null;
+  content_html: string;
+  examples: LeetCodeExample[];
+  example_testcases: string[];
+  python_snippet: string | null;
+};
+
+export type PTPickResponse = {
+  item_id: number;
+  correct: boolean;
+  right_pattern: PTPattern;
+  cue: string;
+  /** Null when Kojo could not write one; the pick still counts. */
+  kojo_note: string | null;
+  attempt: PTGateAttempt;
+};
+
+export type PTGateSolveResponse = { item_id: number; solved: boolean; slow: boolean; redo: PTRedo | null };

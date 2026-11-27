@@ -411,3 +411,16 @@ export function SkeletonTrailPath({ label = "Loading this path" }: { label?: str
     </div>
   );
 }
+
+export function SkeletonTrailGate({ label = "Loading the gate" }: { label?: string }) {
+  return (
+    <div className="page pt-page skel-trail" role="status" aria-label={label}>
+      <Skeleton width="140px" height="0.9rem" />
+      <Skeleton width="min(320px, 70%)" height="1.8rem" />
+      <div className="skel-trail-gate">
+        <Skeleton width="100%" height="320px" />
+        <Skeleton width="100%" height="320px" />
+      </div>
+    </div>
+  );
+}

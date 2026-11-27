@@ -407,7 +407,8 @@ export type TourId =
   | "quizlet-import"
   | "settings"
   | "pattern-trails"
-  | "pattern-trail-path";
+  | "pattern-trail-path"
+  | "pattern-trail-gate";
 
 // Same-tab mirror of users.tours_seen, so a tour cannot replay in the moment
 // before the POST lands. The account is the source of truth.
@@ -3169,4 +3170,41 @@ export async function markTrailLessonWatched(slug: string): Promise<import("./ty
 
 export async function fetchTrailRedos(): Promise<import("./types").PTRedoList> {
   return request<import("./types").PTRedoList>("/pattern-trails/redos");
+}
+
+/** Starts the topic gate, or resumes the unfinished attempt (never reshuffles). */
+export async function startTrailGate(topicSlug: string): Promise<import("./types").PTGateAttempt> {
+  return request<import("./types").PTGateAttempt>(`/pattern-trails/gates/${encodeURIComponent(topicSlug)}/start`, {
+    method: "POST",
+  });
+}
+
+export async function fetchTrailGateAttempt(attemptId: number): Promise<import("./types").PTGateAttempt> {
+  return request<import("./types").PTGateAttempt>(`/pattern-trails/gates/attempts/${attemptId}`);
+}
+
+export async function fetchTrailGateProblem(attemptId: number, itemId: number): Promise<import("./types").PTGateProblem> {
+  return request<import("./types").PTGateProblem>(`/pattern-trails/gates/attempts/${attemptId}/items/${itemId}/problem`);
+}
+
+/** The verdict comes from the server; Kojo's note may be null. */
+export async function pickTrailGate(
+  attemptId: number,
+  body: { item_id: number; picked_key: string; reason: string },
+): Promise<import("./types").PTPickResponse> {
+  return request<import("./types").PTPickResponse>(`/pattern-trails/gates/attempts/${attemptId}/pick`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+/** The editor (gate context) reports the solve; stored only, never blocks the gate. */
+export async function postTrailGateSolve(
+  attemptId: number,
+  body: { item_id: number; accepted: boolean; seconds: number },
+): Promise<import("./types").PTGateSolveResponse> {
+  return request<import("./types").PTGateSolveResponse>(`/pattern-trails/gates/attempts/${attemptId}/solve`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 }
