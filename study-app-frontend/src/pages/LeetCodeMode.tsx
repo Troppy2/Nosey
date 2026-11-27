@@ -1,7 +1,7 @@
 import Editor, { type Monaco } from "@monaco-editor/react";
 import { Gauge, Circle, Eye, ExternalLink, Flame, ListChecks, Loader2, Network, Route, ShieldAlert, Shuffle, Trophy, Users, WrapText, type LucideIcon, Code, Wand2, Archive, ArchiveRestore } from "lucide-react";
 import { BookIcon, ScoreRiseIcon, SettingsIcon } from "../icons";
-import { PlayIcon } from "../icons";
+import { PlayIcon, TrailIcon } from "../icons";
 import {
   ArraysIcon, BacktrackIcon, BinarySearchIcon, BinderIcon, BitsIcon, CodeWindowIcon, DpTableIcon, DrillsIcon, DumbbellIcon,
   GraphIcon, HashTableIcon, HeapIcon, IntervalsIcon, LectureIcon, LinkedListIcon, MathIcon, ProblemListIcon, PuzzleIcon,
@@ -5646,6 +5646,12 @@ export default function LeetCodeMode() {
               <Users size={16} />
               Mock Interview
             </Link>
+            {betaMode ? (
+              <Link to="/pattern-trails" className="lc-official-link">
+                <TrailIcon size={16} />
+                Pattern trails
+              </Link>
+            ) : null}
             {betaMode ? (
               <Link to="/system-design" className="lc-official-link">
                 <Network size={16} />
