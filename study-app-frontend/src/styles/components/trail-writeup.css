@@ -49,9 +49,10 @@
   max-height: 60dvh;
   padding: var(--space-3);
   overflow: auto;
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: var(--ink);
-  color: var(--green-lightest);
+  background: var(--white);
+  color: var(--ink);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   line-height: 1.6;
