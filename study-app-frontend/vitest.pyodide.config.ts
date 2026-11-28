@@ -18,6 +18,7 @@ export default defineConfig({
     hookTimeout: 180_000,
     include: [
       "src/lib/pyodideRunner.multifile.test.ts",
+      "src/lib/pyodideRunner.leetcode.test.ts",
       "src/data/systemDesign/**/solution.test.ts",
     ],
   },

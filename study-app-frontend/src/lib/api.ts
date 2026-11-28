@@ -2105,6 +2105,19 @@ export async function generateLCCustomProblem(
   });
 }
 
+// Kojo fixes a problem it wrote whose reference solution failed its own tests in the
+// editor (see lib/verifyGeneratedProblem.ts). One LLM call per request.
+export async function repairLCCustomProblem(
+  problem: LCGeneratedCustomProblem,
+  failures: { label: string; input: string; expected: string; actual: string; error: string }[],
+  provider?: string,
+): Promise<LCGeneratedCustomProblem> {
+  return request<LCGeneratedCustomProblem>("/leetcode/custom-problems/repair", {
+    method: "POST",
+    body: JSON.stringify({ problem, failures: failures.slice(0, 10), provider }),
+  });
+}
+
 // Fetch (and lazily generate + cache) the KojoCode solution for a custom problem.
 // First call generates + stores it server-side; later calls are a cheap cache hit.
 export async function fetchKojoCodeSolution(

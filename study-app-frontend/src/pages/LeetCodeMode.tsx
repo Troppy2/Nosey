@@ -61,6 +61,7 @@ import {
   syncLCCustomProblem,
   deleteLCCustomProblem,
   generateLCCustomProblem,
+  repairLCCustomProblem,
   streamLCCustomProblems,
   reclassifyLCCustomProblems,
   fetchLCStreakChallenge,
@@ -88,7 +89,8 @@ import {
   deleteLCDrill,
   bulkDeleteLCDrills,
 } from "../lib/api";
-import { runPythonLeetCode, traceLeetCodeExecution, type RunnerResult, type TraceResult } from "../lib/pyodideRunner";
+import { runPythonLeetCode, statementAllowsAnyOrder, traceLeetCodeExecution, type RunnerResult, type TraceResult } from "../lib/pyodideRunner";
+import { verifyGeneratedProblem } from "../lib/verifyGeneratedProblem";
 import { sanitizeLeetCodeHtml } from "../lib/leetcodeHtml";
 import { PROBLEM_ROWS as TAXONOMY_PROBLEM_ROWS, SUBTOPICS_BY_TOPIC } from "../data/leetcodeTaxonomy";
 import { ExecutionVisualizer } from "../components/ExecutionVisualizer";
@@ -3523,24 +3525,40 @@ export default function LeetCodeMode() {
       .filter(Boolean);
     const saved: LCCustomProblem[] = [];
     let error: string | null = null;
+    let dropped = 0;
+    // Problems stream in faster than they can be tested, so checks run one at a time.
+    let checks: Promise<void> = Promise.resolve();
     try {
       await streamLCCustomProblems(
         labels,
         difficulty,
         count,
-        (generated) => {
-          const record = kojoGeneratedToSaved(generated, topicIds, difficulty);
-          saved.push(record);
-          // customProblems is the stable base at call start; we only ever append during
-          // this run, so [...base, ...saved] stays correct across streamed problems.
-          persistCustomProblems([...customProblems, ...saved]);
-          onProgress(saved.length);
-          onSaved(record);
+        (draft) => {
+          checks = checks.then(async () => {
+            const checked = await checkGeneratedProblem(draft);
+            if (checked.status === "failed") {
+              dropped += 1;
+              return;
+            }
+            const record = kojoGeneratedToSaved(checked.problem, topicIds, difficulty);
+            saved.push(record);
+            // customProblems is the stable base at call start; we only ever append during
+            // this run, so [...base, ...saved] stays correct across streamed problems.
+            persistCustomProblems([...customProblems, ...saved]);
+            onProgress(saved.length);
+            onSaved(record);
+          });
         },
         generationProvider,
       );
     } catch (err) {
       error = err instanceof Error ? err.message : "Kojo generation failed.";
+    }
+    await checks;
+    if (dropped && !error) {
+      error = dropped === 1
+        ? "Kojo dropped 1 problem whose tests would not run."
+        : `Kojo dropped ${dropped} problems whose tests would not run.`;
     }
     return { saved, error };
   }
@@ -4197,6 +4215,16 @@ export default function LeetCodeMode() {
     setAiLoading(false);
   }
 
+  // Kojo tests a problem it wrote before anyone sees it: its reference solution must pass
+  // its own tests in this runner, and Kojo fixes the problem (twice at most) when not.
+  function checkGeneratedProblem(generated: LCGeneratedCustomProblem) {
+    return verifyGeneratedProblem(
+      generated,
+      (code, cases) => runPythonLeetCode(code, cases, { anyOrder: statementAllowsAnyOrder(generated.description) }),
+      (problem, failures) => repairLCCustomProblem(problem, failures, generationProvider),
+    );
+  }
+
   function persistCustomProblems(next: LCCustomProblem[]) {
     setCustomProblems(next);
     saveCustomProblems(next);
@@ -4211,7 +4239,12 @@ export default function LeetCodeMode() {
     setAiLoading(true);
     setAiError(null);
     try {
-      const generated: LCGeneratedCustomProblem = await generateLCCustomProblem(aiCode, aiHint, generationProvider);
+      const draft: LCGeneratedCustomProblem = await generateLCCustomProblem(aiCode, aiHint, generationProvider);
+      const checked = await checkGeneratedProblem(draft);
+      const generated = checked.problem;
+      if (checked.status === "failed") {
+        setAiError("Kojo couldn't get every test to run. Check the test cases before you save.");
+      }
       setCustomForm((prev) => ({
         title: generated.title || prev.title,
         topic: generated.topic || prev.topic || "unknown",
@@ -4469,7 +4502,7 @@ export default function LeetCodeMode() {
     }
     try {
       const allCases = [...officialCases, ...validCustomCases];
-      const result = await runPythonLeetCode(codeToRun, allCases);
+      const result = await runPythonLeetCode(codeToRun, allCases, { anyOrder: statementAllowsAnyOrder(problemDataAtRun.content_html) });
       // The result view shows each case's input beside its output, as LeetCode does.
       const inputs = new Map(allCases.map((item) => [item.label, item.inputText]));
       const shown = {

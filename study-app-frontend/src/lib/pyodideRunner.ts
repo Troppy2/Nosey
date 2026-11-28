@@ -104,15 +104,29 @@ async function loadPyodideInstance() {
 // being prepared) would clobber each other's globals. Calls queue up instead.
 let leetCodeQueue: Promise<unknown> = Promise.resolve();
 
-export function runPythonLeetCode(code: string, testCases: TestCase[]): Promise<RunnerResult> {
-  const next = leetCodeQueue.then(() => runPythonLeetCodeNow(code, testCases));
+export type RunnerOptions = {
+  /** The statement says the answer may come back in any order: compare lists as multisets. */
+  anyOrder?: boolean;
+};
+
+/** True when a LeetCode statement lets the answer come back in any order. */
+export function statementAllowsAnyOrder(statementHtml: string | null | undefined): boolean {
+  if (!statementHtml) return false;
+  // Tags become spaces ("in <strong>any order</strong>"), so collapse runs of whitespace.
+  const text = statementHtml.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").toLowerCase();
+  return /\bin any order\b/.test(text);
+}
+
+export function runPythonLeetCode(code: string, testCases: TestCase[], options: RunnerOptions = {}): Promise<RunnerResult> {
+  const next = leetCodeQueue.then(() => runPythonLeetCodeNow(code, testCases, options));
   leetCodeQueue = next.catch(() => undefined);
   return next;
 }
 
-async function runPythonLeetCodeNow(code: string, testCases: TestCase[]): Promise<RunnerResult> {
+async function runPythonLeetCodeNow(code: string, testCases: TestCase[], options: RunnerOptions): Promise<RunnerResult> {
   const pyodide = await loadPyodideInstance();
   const payload = JSON.stringify(testCases);
+  const anyOrder = options.anyOrder ? "True" : "False";
   const runner = `
 from typing import *
 import ast
@@ -220,9 +234,27 @@ def literal_eval_json(node):
     ast.fix_missing_locations(node)
     return ast.literal_eval(node)
 
+def clean_text(text):
+    # Statements carry non-breaking and zero-width spaces that Python cannot parse.
+    return text.replace(chr(160), " ").replace(chr(8203), "").replace(chr(65279), "")
+
 def parse_named_args(text):
-    call = ast.parse(f"f({text})", mode="eval").body
+    call = ast.parse(f"f({clean_text(text)})", mode="eval").body
     return [(kw.arg or "", literal_eval_json(kw.value)) for kw in call.keywords]
+
+def parse_design_input(text):
+    # Design problems (MinStack, LRUCache...): one line of method names, one of arguments.
+    lines = [line.strip() for line in clean_text(text).strip().split(chr(10)) if line.strip()]
+    if len(lines) != 2 or not lines[0].startswith("["):
+        return None
+    try:
+        ops = json.loads(lines[0])
+        args = json.loads(lines[1])
+    except Exception:
+        return None
+    if not ops or not all(isinstance(op, str) for op in ops) or len(ops) != len(args):
+        return None
+    return ops, args
 
 def normalize_annotation(annotation):
     if annotation is inspect._empty:
@@ -286,16 +318,127 @@ def serialize_value(value):
         return [serialize_value(v) for v in value]
     return value
 
-def normalize_expected(text):
-    text = text.strip()
+def _parse_literal(text):
     try:
-        return json.loads(text)
+        return True, json.loads(text)
     except Exception:
         pass
     try:
-        return ast.literal_eval(text)
+        return True, literal_eval_json(ast.parse(text, mode="eval").body)
     except Exception:
-        return text
+        return False, text
+
+def normalize_expected(text):
+    text = clean_text(text).strip()
+    ok, value = _parse_literal(text)
+    if ok:
+        return value
+    # Some outputs carry a trailing note ("[3,1]" then "Note: ... also accepted").
+    first = text.split(chr(10))[0].strip()
+    ok, value = _parse_literal(first)
+    return value if ok else text
+
+def parse_count_form(text):
+    # "2, nums = [1,2,_]": the returned count, then what the first k slots must hold.
+    head, sep, rest = clean_text(text).strip().partition(",")
+    if not sep or "=" not in rest:
+        return None
+    try:
+        count = int(head.strip())
+    except ValueError:
+        return None
+    _, _, array = rest.partition("=")
+    array = array.strip()
+    if not (array.startswith("[") and array.endswith("]")):
+        return None
+    items = [item.strip() for item in array[1:-1].split(",") if item.strip()]
+    return count, [normalize_expected(item) for item in items if item != "_"]
+
+def _canon(value):
+    if isinstance(value, list):
+        return sorted((_canon(item) for item in value), key=repr)
+    return value
+
+def _close(a, b):
+    if isinstance(a, bool) or isinstance(b, bool):
+        return a == b
+    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+        return abs(a - b) <= 1e-5 * max(1.0, abs(b))
+    if isinstance(a, list) and isinstance(b, list):
+        return len(a) == len(b) and all(_close(x, y) for x, y in zip(a, b))
+    return a == b
+
+def values_match(actual, expected):
+    # Floats within 1e-5 (LeetCode's judge); lists in any order when the statement allows it.
+    if ANY_ORDER:
+        return _close(_canon(actual), _canon(expected))
+    return _close(actual, expected)
+
+def find_tree_node(root, value):
+    queue = deque([root])
+    while queue:
+        node = queue.popleft()
+        if node is None:
+            continue
+        if node.val == value:
+            return node
+        queue.append(node.left)
+        queue.append(node.right)
+    return None
+
+class GraphNode:
+    def __init__(self, val=0, neighbors=None):
+        self.val = val
+        self.neighbors = neighbors if neighbors is not None else []
+
+class RandomNode:
+    def __init__(self, x=0, next=None, random=None):
+        self.val = int(x)
+        self.next = next
+        self.random = random
+
+def build_graph(adj):
+    # clone-graph style: node i + 1 lists its neighbors' values.
+    if not adj:
+        return None
+    nodes = [GraphNode(i + 1) for i in range(len(adj))]
+    for i, neighbors in enumerate(adj):
+        nodes[i].neighbors = [nodes[v - 1] for v in neighbors]
+    return nodes[0]
+
+def graph_to_adj(node):
+    if node is None:
+        return []
+    seen = {node.val: node}
+    queue = deque([node])
+    while queue:
+        cur = queue.popleft()
+        for nb in cur.neighbors:
+            if nb.val not in seen:
+                seen[nb.val] = nb
+                queue.append(nb)
+    return [[nb.val for nb in seen[v].neighbors] for v in sorted(seen)]
+
+def build_random_list(pairs):
+    nodes = [RandomNode(val) for val, _ in pairs]
+    for i, (_, rnd) in enumerate(pairs):
+        if i + 1 < len(nodes):
+            nodes[i].next = nodes[i + 1]
+        nodes[i].random = nodes[rnd] if rnd is not None else None
+    return nodes[0] if nodes else None
+
+def random_list_to_pairs(head):
+    nodes = []
+    index = {}
+    cur = head
+    while cur is not None and len(nodes) < _MAX_NODES:
+        index[id(cur)] = len(nodes)
+        nodes.append(cur)
+        cur = cur.next
+    return [[n.val, index.get(id(n.random)) if n.random is not None else None] for n in nodes]
+
+def _is_random_pairs(value):
+    return isinstance(value, list) and all(isinstance(p, list) and len(p) == 2 for p in value)
 
 _EXEC_TIMEOUT = 5.0
 
@@ -310,6 +453,7 @@ RESULT = {"ok": False, "output": "", "cases": []}
 
 user_code = ${JSON.stringify(code)}
 test_cases = json.loads(${JSON.stringify(payload)})
+ANY_ORDER = ${anyOrder}
 
 _PRELUDE = """from typing import *
 from collections import deque, defaultdict, Counter, OrderedDict
@@ -320,11 +464,18 @@ import functools
 import itertools
 """
 
+def _case_arg_names(case):
+    try:
+        return [name for name, _ in parse_named_args(case["inputText"]) if name != "pos"]
+    except Exception:
+        return None
+
 def select_callable(namespace, new_keys, first_case):
     """Prefer a class Solution method; otherwise fall back to a bare top-level
-    function the user pasted. When several functions exist, pick the one whose
-    parameter count matches the first test case so 'just paste a function' works."""
+    function the user pasted. With several methods or functions, pick the one whose
+    parameter names (then count) match the first test case, so helpers never run."""
     import types as _types
+    wanted = _case_arg_names(first_case) if first_case else None
     solution_cls = namespace.get("Solution")
     if isinstance(solution_cls, type):
         method_names = [
@@ -333,7 +484,15 @@ def select_callable(namespace, new_keys, first_case):
         ]
         if not method_names:
             raise ValueError("class Solution needs at least one public method to run.")
-        return getattr(solution_cls(), method_names[0])
+        instance = solution_cls()
+        if wanted is not None and len(method_names) > 1:
+            for name in method_names:
+                if list(inspect.signature(getattr(instance, name)).parameters) == wanted:
+                    return getattr(instance, name)
+            for name in method_names:
+                if len(inspect.signature(getattr(instance, name)).parameters) == len(wanted):
+                    return getattr(instance, name)
+        return getattr(instance, method_names[0])
 
     func_candidates = [
         namespace[k] for k in new_keys
@@ -341,22 +500,76 @@ def select_callable(namespace, new_keys, first_case):
     ]
     if not func_candidates:
         raise ValueError("To run, your code needs a top-level function or a class Solution.")
-    if len(func_candidates) == 1 or first_case is None:
+    if len(func_candidates) == 1 or wanted is None:
         return func_candidates[-1]
-    try:
-        wanted = len(parse_named_args(first_case["inputText"]))
-        for fn in func_candidates:
-            if len(inspect.signature(fn).parameters) == wanted:
-                return fn
-    except Exception:
-        pass
+    for fn in func_candidates:
+        if list(inspect.signature(fn).parameters) == wanted:
+            return fn
+    for fn in func_candidates:
+        if len(inspect.signature(fn).parameters) == len(wanted):
+            return fn
     return func_candidates[-1]
+
+def _timed(fn, *args):
+    _sys.settrace(_make_timeout_tracer(_time.time() + _EXEC_TIMEOUT))
+    try:
+        return fn(*args)
+    finally:
+        _sys.settrace(None)
+
+def _record(case, passed, actual, expected):
+    RESULT["cases"].append({
+        "label": case["label"],
+        "passed": bool(passed),
+        "actual": repr(actual),
+        "expected": repr(expected),
+    })
+
+def run_design_case(namespace, case, design):
+    # LeetCode runs the constructor, then each method in order; constructors return null.
+    ops, op_args = design
+    cls = namespace.get(ops[0])
+    if not isinstance(cls, type):
+        raise ValueError(f"Couldn't find class {ops[0]} in your code.")
+    obj = _timed(cls, *op_args[0])
+    actual = [None]
+    for op, arg in zip(ops[1:], op_args[1:]):
+        actual.append(serialize_value(_timed(getattr(obj, op), *arg)))
+    expected = normalize_expected(case["expectedOutput"])
+    _record(case, values_match(actual, expected), actual, expected)
+
+def run_codec_case(namespace, case):
+    # serialize / deserialize: the tree must survive the round trip.
+    raw_args = parse_named_args(case["inputText"])
+    root = build_tree(raw_args[0][1]) if raw_args else None
+    codec = namespace["Codec"]
+    actual = serialize_value(_timed(codec().deserialize, _timed(codec().serialize, root)))
+    if actual is None:
+        actual = []
+    expected = normalize_expected(case["expectedOutput"])
+    _record(case, values_match(actual, expected), actual, expected)
 
 try:
     namespace = {}
     exec(_PRELUDE, namespace)
     namespace["ListNode"] = ListNode
     namespace["TreeNode"] = TreeNode
+    first_case = test_cases[0] if test_cases else None
+    design_first = parse_design_input(first_case["inputText"]) if first_case else None
+    # LeetCode's Node class differs per problem: graph neighbors or a random pointer.
+    graph_input = False
+    random_input = False
+    if first_case and not design_first:
+        try:
+            _names = parse_named_args(first_case["inputText"])
+            graph_input = bool(_names) and _names[0][0] == "adjList"
+            random_input = bool(_names) and _names[0][0] == "head" and bool(_names[0][1]) and _is_random_pairs(_names[0][1])
+        except Exception:
+            pass
+    if graph_input:
+        namespace["Node"] = GraphNode
+    elif random_input:
+        namespace["Node"] = RandomNode
     _before_keys = set(namespace.keys())
     exec(user_code, namespace)
     _new_keys = [k for k in namespace.keys() if k not in _before_keys]
@@ -364,45 +577,96 @@ try:
     ListNode = namespace.get("ListNode", ListNode)
     TreeNode = namespace.get("TreeNode", TreeNode)
 
-    method = select_callable(namespace, _new_keys, test_cases[0] if test_cases else None)
-    signature = inspect.signature(method)
-    parameters = list(signature.parameters.values())
-    # An empty list or tree is None in code and [] (or null) in the expected
-    # output; for node-returning methods all three mean the same answer.
-    _ret = signature.return_annotation
-    returns_nodes = annotation_mentions(_ret, "ListNode") or annotation_mentions(_ret, "TreeNode")
-
     _run_started = _time.perf_counter()
-    for case in test_cases:
-        try:
-            raw_args = parse_named_args(case["inputText"])
-        except Exception:
-            raise ValueError(f"Couldn't read the input for {case['label']}. Write it like the examples, for example nums = [1, 2], target = 3.")
-        if len(raw_args) != len(parameters):
-            raise ValueError(f"Couldn't match the testcase input to the Python method signature for {case['label']}.")
-        args = []
-        for (name, value), parameter in zip(raw_args, parameters):
-            args.append(adapt_value(value, parameter.annotation, parameter.name))
-        _sys.settrace(_make_timeout_tracer(_time.time() + _EXEC_TIMEOUT))
-        try:
-            actual = serialize_value(method(*args))
-        finally:
-            _sys.settrace(None)
-        expected = normalize_expected(case["expectedOutput"])
-        if returns_nodes or (_ret is inspect._empty and expected == []):
-            if actual is None:
-                actual = []
-            if expected is None:
-                expected = []
-        RESULT["cases"].append({
-            "label": case["label"],
-            "passed": actual == expected,
-            "actual": repr(actual),
-            "expected": repr(expected),
-        })
+    _codec = namespace.get("Codec")
+    is_codec = isinstance(_codec, type) and hasattr(_codec, "serialize") and not isinstance(namespace.get("Solution"), type)
+    if design_first or is_codec:
+        for case in test_cases:
+            design = parse_design_input(case["inputText"])
+            if design:
+                run_design_case(namespace, case, design)
+            elif is_codec:
+                run_codec_case(namespace, case)
+            else:
+                raise ValueError(f"Write {case['label']} like the examples: method names on one line, their arguments on the next.")
+    else:
+        method = select_callable(namespace, _new_keys, first_case)
+        signature = inspect.signature(method)
+        parameters = list(signature.parameters.values())
+        # An empty list or tree is None in code and [] (or null) in the expected
+        # output; for node-returning methods all three mean the same answer.
+        _ret = signature.return_annotation
+        returns_nodes = annotation_mentions(_ret, "ListNode") or annotation_mentions(_ret, "TreeNode")
+        returns_nothing = _ret is None or _ret is inspect._empty or str(_ret) == "None"
+
+        for case in test_cases:
+            try:
+                raw_args = parse_named_args(case["inputText"])
+            except Exception:
+                raise ValueError(f"Couldn't read the input for {case['label']}. Write it like the examples, for example nums = [1, 2], target = 3.")
+            # Linked list cycle problems pass the cycle's start as pos; it is not a parameter.
+            pos = None
+            if len(raw_args) == len(parameters) + 1 and any(name == "pos" for name, _ in raw_args):
+                pos = next(value for name, value in raw_args if name == "pos")
+                raw_args = [(name, value) for name, value in raw_args if name != "pos"]
+            if len(raw_args) != len(parameters):
+                raise ValueError(f"Couldn't match the testcase input to the Python method signature for {case['label']}.")
+            args = []
+            for (name, value), parameter in zip(raw_args, parameters):
+                if graph_input and name == "adjList":
+                    args.append(build_graph(value))
+                elif random_input and name == "head" and _is_random_pairs(value):
+                    args.append(build_random_list(value))
+                else:
+                    args.append(adapt_value(value, parameter.annotation, parameter.name))
+            if isinstance(pos, int) and not isinstance(pos, bool) and pos >= 0 and args and _is_list_node(args[0]):
+                nodes = []
+                cur = args[0]
+                while cur is not None:
+                    nodes.append(cur)
+                    cur = cur.next
+                if pos < len(nodes):
+                    nodes[-1].next = nodes[pos]
+            # Tree problems that name nodes by value (lowest common ancestor: p = 2, q = 8).
+            tree_root = next((a for a in args if _is_tree_node(a)), None)
+            if tree_root is not None:
+                for i, parameter in enumerate(parameters):
+                    if isinstance(args[i], int) and not isinstance(args[i], bool) and (
+                        annotation_mentions(parameter.annotation, "TreeNode") or parameter.name in ("p", "q")
+                    ):
+                        found = find_tree_node(tree_root, args[i])
+                        if found is not None:
+                            args[i] = found
+            returned = _timed(method, *args)
+            count_form = parse_count_form(case["expectedOutput"])
+            if count_form is not None:
+                # remove-element style: the count, and the first k slots of the array.
+                count, want = count_form
+                got = serialize_value(args[0])[:count] if args and isinstance(returned, int) else None
+                passed = returned == count and got is not None and values_match(got, want)
+                _record(case, passed, f"{returned}, {got}", f"{count}, {want}")
+                continue
+            expected = normalize_expected(case["expectedOutput"])
+            if graph_input:
+                actual = graph_to_adj(returned)
+            elif random_input:
+                actual = random_list_to_pairs(returned)
+            elif _is_tree_node(returned) and isinstance(expected, int) and not isinstance(expected, bool):
+                actual = returned.val
+            elif returned is None and returns_nothing and args and expected is not None and expected != []:
+                # In-place problems return nothing; LeetCode checks the first argument.
+                actual = serialize_value(args[0])
+            else:
+                actual = serialize_value(returned)
+            if returns_nodes or (_ret is inspect._empty and expected == []):
+                if actual is None:
+                    actual = []
+                if expected is None:
+                    expected = []
+            _record(case, values_match(actual, expected), actual, expected)
 
     RESULT["runtime_ms"] = round((_time.perf_counter() - _run_started) * 1000, 1)
-    RESULT["ok"] = all(case["passed"] for case in RESULT["cases"])
+    RESULT["ok"] = bool(RESULT["cases"]) and all(case["passed"] for case in RESULT["cases"])
     RESULT["output"] = "All tests passed." if RESULT["ok"] else "Some tests failed."
 except Exception:
     RESULT["ok"] = False

@@ -218,6 +218,22 @@ class LCGeneratedCustomProblem(BaseModel):
     description: str = ""
     starter_code: str = ""
     test_cases: list[LCCustomTestCase] = Field(default_factory=list)
+    # Kojo's own solution, used only to check in the editor that the tests run.
+    reference_solution: str = ""
+
+
+class LCRepairFailure(BaseModel):
+    label: str = Field(default="", max_length=80)
+    input: str = Field(default="", max_length=4000)
+    expected: str = Field(default="", max_length=4000)
+    actual: str = Field(default="", max_length=4000)
+    error: str = Field(default="", max_length=4000)
+
+
+class LCRepairCustomProblemRequest(BaseModel):
+    problem: LCGeneratedCustomProblem
+    failures: list[LCRepairFailure] = Field(default_factory=list, max_length=10)
+    provider: Optional[str] = None
 
 
 # ── KojoCode solution (custom-problem solution reveal) ────────────────────────

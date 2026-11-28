@@ -217,6 +217,19 @@ class LeetCodeService:
 
         return self._normalize_generated_problem(data, fallback_code=code)
 
+    async def repair_custom_problem(
+        self,
+        problem: LCGeneratedCustomProblem,
+        failures: list[dict[str, str]],
+        provider: Optional[str] = None,
+    ) -> LCGeneratedCustomProblem:
+        """Ask Kojo to fix a generated problem whose reference solution failed its own tests."""
+        try:
+            data = await LLMService().repair_custom_problem(problem.model_dump(), failures, provider=provider)
+        except Exception as exc:
+            raise LLMException("Kojo couldn't fix that problem. Try generating again.") from exc
+        return self._normalize_generated_problem(data, fallback_code=problem.starter_code)
+
     async def generate_solution_article(
         self,
         title: str,
@@ -434,6 +447,7 @@ class LeetCodeService:
             description=str(data.get("description", "") or "").strip()[:20000],
             starter_code=str(data.get("starter_code", "") or fallback_code or "").strip()[:20000],
             test_cases=test_cases,
+            reference_solution=str(data.get("reference_solution", "") or "").strip()[:20000],
         )
 
     async def _fetch_problem(
@@ -527,9 +541,11 @@ class LeetCodeService:
         pre_blocks = re.findall(r"<pre>(.*?)</pre>", content_html, flags=re.DOTALL | re.IGNORECASE)
         for index, raw_block in enumerate(pre_blocks, start=1):
             block_text = self._html_to_text(raw_block)
-            input_match = re.search(r"Input:\s*(.+?)(?:\nOutput:|\Z)", block_text, flags=re.DOTALL)
-            output_match = re.search(r"Output:\s*(.+?)(?:\nExplanation:|\Z)", block_text, flags=re.DOTALL)
-            explanation_match = re.search(r"Explanation:\s*(.+?)\Z", block_text, flags=re.DOTALL)
+            input_match = re.search(r"(?:^|\n)\s*Input:?\s*(.+?)(?=\n\s*Output:?\s|\Z)", block_text, flags=re.DOTALL)
+            output_match = re.search(
+                r"(?:^|\n)\s*Output:?\s*(.+?)(?=\n\s*(?:Explanation|Explaination|Note):?\s|\Z)", block_text, flags=re.DOTALL
+            )
+            explanation_match = re.search(r"(?:^|\n)\s*Explanation:?\s*(.+?)\Z", block_text, flags=re.DOTALL)
             if not input_match or not output_match:
                 continue
             examples.append(
@@ -586,7 +602,7 @@ class LeetCodeService:
             # The last example runs into the constraints / follow-up sections.
             block = re.split(r"^\s*(?:Constraints|Follow[- ]?up|Note)\s*:", block, maxsplit=1, flags=re.MULTILINE | re.IGNORECASE)[0]
             input_match = re.search(r"Input:\s*(.+?)(?=\n\s*Output:|\Z)", block, flags=re.DOTALL)
-            output_match = re.search(r"Output:\s*(.+?)(?=\n\s*Explanation:|\Z)", block, flags=re.DOTALL)
+            output_match = re.search(r"Output:\s*(.+?)(?=\n\s*(?:Explanation|Explaination|Note):|\Z)", block, flags=re.DOTALL)
             explanation_match = re.search(r"Explanation:\s*(.+?)\Z", block, flags=re.DOTALL)
             if not input_match or not output_match:
                 continue
@@ -609,7 +625,7 @@ class LeetCodeService:
         text = re.sub(r"</li\s*>", "\n", text, flags=re.IGNORECASE)
         text = re.sub(r"<li[^>]*>", "- ", text, flags=re.IGNORECASE)
         text = re.sub(r"<[^>]+>", "", text)
-        return unescape(text).strip()
+        return unescape(text).replace("\u00a0", " ").replace("\u200b", "").strip()
 
     def _build_hint_prompt(
         self,

@@ -5658,6 +5658,56 @@ CRITICAL rules for "test_cases" so they can actually run:
 - "output_text" MUST be a single Python literal that equals the expected return value, e.g. `[0, 1]` or `True` or `"abc"`.
 - Cover normal cases plus at least one edge case (empty input, single element, or a no-solution case) when applicable.
 - Every test case must be correct for the given starter_code.
+- "reference_solution": a complete, correct Python solution: the SAME `class Solution` and method signature as starter_code, fully implemented, that returns exactly each test case's output_text. It is used to check that every test case runs; the student never sees it.
+
+Return only the JSON object."""
+
+    async def repair_custom_problem(
+        self,
+        problem: dict[str, object],
+        failures: list[dict[str, str]],
+        provider: Optional[str] = None,
+    ) -> dict[str, object]:
+        """Fix a generated problem whose reference solution did not pass its own tests in
+        the editor. One JSON call (provider fallback inside _complete_json); the caller
+        decides whether to ask again, so there is no loop here."""
+        return await self._complete_json(self._build_problem_repair_prompt(problem, failures), provider=provider)
+
+    def _build_problem_repair_prompt(self, problem: dict[str, object], failures: list[dict[str, str]]) -> str:
+        cases = json.dumps(problem.get("test_cases", []), indent=1)[:8000]
+        failure_lines = "\n".join(
+            f"- {f.get('label', 'case')}: input `{f.get('input', '')[:500]}` expected `{f.get('expected', '')[:300]}`"
+            f" got `{f.get('actual', '')[:300]}`" + (f" error: {f.get('error', '')[:600]}" if f.get("error") else "")
+            for f in failures[:10]
+        )
+        return f"""A practice problem you wrote does not run cleanly. Its reference solution was run against its own test cases in a Python runner, and they disagree.
+
+TITLE: {str(problem.get("title", ""))[:300]}
+
+DESCRIPTION:
+{str(problem.get("description", ""))[:6000]}
+
+STARTER CODE:
+```python
+{str(problem.get("starter_code", ""))[:4000]}
+```
+
+REFERENCE SOLUTION:
+```python
+{str(problem.get("reference_solution", ""))[:6000]}
+```
+
+TEST CASES (JSON):
+{cases}
+
+WHAT THE RUNNER REPORTED:
+{failure_lines or "- the reference solution failed to run"}
+
+How the runner works: it calls the single method of `class Solution` with the named arguments in "input_text" (Python literals, `null`/`true`/`false` allowed) and compares the return value with "output_text" parsed as a Python or JSON literal. Floats match within 1e-5.
+
+Decide what is wrong: the reference solution, a test case's expected output, or a test case's format. Fix it so the reference solution passes every test case and every test case matches the description. Keep the same problem, title and method signature.
+
+Return a JSON object ONLY (no prose, no code fences) with EXACTLY these keys: "title", "topic", "subtopic", "difficulty", "description", "starter_code", "test_cases" (3 to 5 objects with "input_text", "output_text", "explanation_text"), "reference_solution".
 
 Return only the JSON object."""
 
@@ -5753,6 +5803,7 @@ CRITICAL rules for "test_cases" so they can actually run:
 - "output_text" MUST be a single Python literal that equals the expected return value, e.g. `[0, 1]` or `True` or `"abc"`.
 - Cover normal cases plus at least one edge case when applicable.
 - Every test case must be correct for that problem's starter_code.
+- "reference_solution": a complete, correct Python solution with the SAME `class Solution` and method signature as starter_code, fully implemented, returning exactly each test case's output_text. It is used to check the tests run; the student never sees it.
 
 Return only the JSON object."""
 

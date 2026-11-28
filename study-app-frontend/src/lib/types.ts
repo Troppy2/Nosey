@@ -928,6 +928,8 @@ export type LCGeneratedCustomProblem = {
   description: string;
   starter_code: string;
   test_cases: LCCustomTestCase[];
+  /** Kojo's own solution, only used to check in the editor that the tests run. */
+  reference_solution?: string;
 };
 
 // One annotated line of a KojoCode solution: the exact source line plus a plain-
