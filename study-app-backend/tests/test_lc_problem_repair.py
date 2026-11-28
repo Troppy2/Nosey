@@ -54,3 +54,61 @@ async def test_a_failed_repair_is_an_llm_error(monkeypatch):
     monkeypatch.setattr(LLMService, "repair_custom_problem", boom)
     with pytest.raises(LLMException):
         await LeetCodeService().repair_custom_problem(PROBLEM, FAILURES)
+
+
+# ── The route ────────────────────────────────────────────────────────────────
+
+import pytest_asyncio  # noqa: E402
+from httpx import AsyncClient  # noqa: E402
+
+from src.dependencies import get_current_user  # noqa: E402
+from src.limiter import limiter  # noqa: E402
+from src.main import app  # noqa: E402
+from src.models.user import User  # noqa: E402
+from src.routes import leetcode_repair  # noqa: E402
+
+
+@pytest_asyncio.fixture
+async def client(monkeypatch):
+    screened: list[str] = []
+
+    async def _screen(user, feature, *texts, **kwargs):
+        screened.extend(t for t in texts if t)
+
+    async def _repair(self, problem, failures, provider=None):
+        return problem
+
+    monkeypatch.setattr(leetcode_repair, "screen_user_input", _screen)
+    monkeypatch.setattr(LeetCodeService, "repair_custom_problem", _repair)
+    app.dependency_overrides[get_current_user] = lambda: User(id=1, email="t@example.test", google_id="g")
+    limiter.reset()
+    try:
+        async with AsyncClient(app=app, base_url="http://test") as http:
+            http.screened = screened  # type: ignore[attr-defined]
+            yield http
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_route_screens_every_field_including_tests_and_failures(client):
+    failures = [{"label": "Test 1", "input": "nums = [9]", "expected": "SECRET-EXPECTED", "actual": "SECRET-ACTUAL"}]
+    problem = PROBLEM.model_dump()
+    problem["test_cases"][0]["explanation_text"] = "SECRET-EXPLANATION"
+    res = await client.post("/leetcode/custom-problems/repair", json={"problem": problem, "failures": failures})
+    assert res.status_code == 200, res.text
+    screened = " ".join(client.screened)
+    for text in ("SECRET-EXPECTED", "SECRET-ACTUAL", "SECRET-EXPLANATION", "nums = [1, 2, 4]", "Count Evens"):
+        assert text in screened
+
+
+@pytest.mark.asyncio
+async def test_route_rejects_oversized_problems(client):
+    problem = PROBLEM.model_dump()
+    problem["test_cases"] = problem["test_cases"] * 11
+    res = await client.post("/leetcode/custom-problems/repair", json={"problem": problem, "failures": []})
+    assert res.status_code == 400
+    problem = PROBLEM.model_dump()
+    problem["description"] = "x" * 70_000
+    res = await client.post("/leetcode/custom-problems/repair", json={"problem": problem, "failures": []})
+    assert res.status_code == 400

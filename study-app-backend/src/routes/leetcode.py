@@ -48,7 +48,6 @@ from src.schemas.leetcode_schema import (
     LCDrillCreateRequest,
     LCDrillScheduleResponse,
     LCGenerateCustomProblemRequest,
-    LCRepairCustomProblemRequest,
     LCGenerateCustomProblemsStreamRequest,
     LCGeneratedCustomProblem,
     LCPrepBankCreateRequest,
@@ -935,28 +934,6 @@ async def generate_custom_problem(
         return await LeetCodeService().generate_custom_problem(
             code=body.code,
             hint=body.hint,
-            provider=resolve_request_provider(user, body.provider),
-        )
-    except LLMException as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-
-
-@router.post("/custom-problems/repair", response_model=LCGeneratedCustomProblem)
-async def repair_custom_problem(
-    body: LCRepairCustomProblemRequest,
-    user: User = Depends(get_current_user),
-) -> LCGeneratedCustomProblem:
-    """Kojo fixes a problem it wrote whose reference solution failed its own tests in the
-    editor. The browser runs the tests (the server runs no code) and calls this at most
-    twice per problem; each call is one LLM request."""
-    problem = body.problem
-    await screen_user_input(
-        user, "leetcode_custom", problem.title, problem.description, problem.starter_code, problem.reference_solution
-    )
-    try:
-        return await LeetCodeService().repair_custom_problem(
-            problem,
-            [f.model_dump() for f in body.failures],
             provider=resolve_request_provider(user, body.provider),
         )
     except LLMException as exc:
